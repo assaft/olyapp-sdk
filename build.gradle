@@ -1,6 +1,7 @@
 apply plugin: 'java'
+apply plugin: 'eclipse'
 
-sourceCompatibility = 1.5
+sourceCompatibility = 1.6
 version = '0.1'
 
 task wrapper(type: Wrapper) {
@@ -10,7 +11,7 @@ task wrapper(type: Wrapper) {
 //create a single Jar with all dependencies
 task packjar(type: Jar) {
 	manifest {
-        attributes 'Implementation-Title': 'SDK for developing apps for Olympus cameras',  
+        attributes 'Implementation-Title': 'SDK for developing oly apps',  
         	'Implementation-Version': version
         
     }

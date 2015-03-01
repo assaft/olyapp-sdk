@@ -1,5 +1,5 @@
 package org.olyapp.sdk;
 
 public enum ShootingMode {
-	Program, Aperture, Shutter, Manual, ART, iAuto; 
+	iAuto, Program, Aperture, Shutter, Manual, ART; 
 }

@@ -13,6 +13,11 @@ public class ICameraAPI implements CameraAPI {
 	}
 
 	@Override
+	public String getConnectionModel() {
+		return ICameraProtocol.getInst().getConnectionModel();
+	}
+	
+	@Override
 	public String getCommandList() {
 		return ICameraProtocol.getInst().getCommandList();
 	}
