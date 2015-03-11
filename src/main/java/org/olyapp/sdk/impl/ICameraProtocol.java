@@ -3,7 +3,11 @@ package org.olyapp.sdk.impl;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.StringTokenizer;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -11,7 +15,6 @@ import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 
 import org.apache.http.HttpEntity;
-import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -22,26 +25,30 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
-import org.olyapp.sdk.Aperture;
-import org.olyapp.sdk.CameraProtocol;
+import org.olyapp.sdk.CameraProperty;
 import org.olyapp.sdk.ControlMode;
-import org.olyapp.sdk.ExposureValue;
-import org.olyapp.sdk.FocusPoint;
 import org.olyapp.sdk.FocusResult;
-import org.olyapp.sdk.ISO;
-import org.olyapp.sdk.ShootingMode;
-import org.olyapp.sdk.ShutterSpeed;
-import org.olyapp.sdk.io.CamInfo;
-import org.olyapp.sdk.io.CommandList;
-import org.olyapp.sdk.io.ConnectMode;
-import org.olyapp.sdk.io.FocusResponse;
-import org.olyapp.sdk.io.SetParam;
-import org.olyapp.sdk.io.StartTake;
+import org.olyapp.sdk.Frame;
+import org.olyapp.sdk.Image;
+import org.olyapp.sdk.Point;
+import org.olyapp.sdk.ProtocolError;
+import org.olyapp.sdk.lvsrv.LiveViewServer;
+import org.olyapp.sdk.utils.JpegUtils;
+import org.olyapp.sdk.xml.CamInfo;
+import org.olyapp.sdk.xml.CommandList;
+import org.olyapp.sdk.xml.ConnectMode;
+import org.olyapp.sdk.xml.Desc;
+import org.olyapp.sdk.xml.DescList;
+import org.olyapp.sdk.xml.FocusResponse;
+import org.olyapp.sdk.xml.SetParam;
+import org.olyapp.sdk.xml.StartTake;
 
-public class ICameraProtocol implements CameraProtocol {
+public class ICameraProtocol {
 
 
 	private static final String CAMERA_IP = "192.168.0.10";
+	
+	private static final int 	LV_PORT = 50529;
 
 	private static final String CHAR_SET = "ISO-8859-1";
 	
@@ -51,7 +58,7 @@ public class ICameraProtocol implements CameraProtocol {
 	private static final String SWITCH_MODE = "/switch_cammode.cgi";  // ?mode=play
 	private static final String SET_TIME = "/set_utctimediff.cgi"; //?utctime=20150227T103539&diff=%2B0200
 	//private static final String /switch_cammode.cgi?mode=rec&lvqty=0640x0480
-	private static final String GET_PROP = "/get_camprop.cgi"; //?com=desc&propname=desclist
+	private static final String GET_PROP = "/get_camprop.cgi"; //
 	private static final String SET_PROP = "/set_camprop.cgi";
 	
 	private static final String TAKE_MISC = "exec_takemisc";
@@ -62,7 +69,6 @@ public class ICameraProtocol implements CameraProtocol {
 	private static final Unmarshaller jaxbUnmarshaller = initUnmarshaller();
 	private static final Marshaller jaxbMarshaller = initMarshaller(); 
 			
-	
     private static JAXBContext initContext() {
         try {
 			return JAXBContext.newInstance(
@@ -70,7 +76,9 @@ public class ICameraProtocol implements CameraProtocol {
 					CommandList.class,
 					ConnectMode.class,
 					FocusResponse.class,
-					SetParam.class);
+					SetParam.class,
+					Desc.class,
+					DescList.class);
 		} catch (JAXBException e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);
@@ -139,16 +147,16 @@ Connection: close
 	private final RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(3 * 1000).build();
 	private final VoidHandler voidHandler = new VoidHandler();
 
+	private LiveViewServer liveViewServer; 
+	
 	private ICameraProtocol() {
 	}
-
 	
-	
-	private <T> T doGet(String s, Handler<T> handler) {
+	private <T> T doGet(String s, Handler<T> handler) throws ProtocolError {
 		return request(new HttpGet(s),handler);
 	}
 	
-	private <T> T doPost(String s, Object o, Handler<T> handler) {
+	private <T> T doPost(String s, Object o, Handler<T> handler) throws ProtocolError {
 		try {
 			StringWriter sw = new StringWriter();
 			jaxbMarshaller.marshal(o, sw);
@@ -157,24 +165,24 @@ Connection: close
 			return request(httppost,handler);
 		} catch (JAXBException e) {
 			e.printStackTrace();
-			throw new RuntimeException(e);
+			throw new ProtocolError(e.getMessage());
 		}
 
 	}
 	
-	private <T> T request(HttpUriRequest httpRequest, Handler<T> handler) {
+	private <T> T request(HttpUriRequest httpRequest, Handler<T> handler) throws ProtocolError {
 		CloseableHttpClient httpclient = HttpClientBuilder.create().setDefaultRequestConfig(requestConfig).build();
 		CloseableHttpResponse response = null;
 		try {
 			response = httpclient.execute(httpRequest);
 	        int statusCode = response.getStatusLine().getStatusCode();
 	        if (statusCode != 200) {
-	            throw new RuntimeException("Failed with HTTP error code : " + statusCode);
+	            throw new ProtocolError("Failed with HTTP error code : " + statusCode);
 	        }
 	        return handler.handleResponse(response);
 		} catch (IOException e) {
 			e.printStackTrace();
-			throw new RuntimeException(e);
+			throw new ProtocolError(e.getMessage());
 		} finally {
 			if (response!=null) {
 				try {
@@ -216,6 +224,18 @@ Connection: close
 		}
 	}
 	
+	private static class BinaryHandler extends Handler<byte[]> {
+		@Override
+		byte[] handleResponse(HttpResponse response) {
+			try {
+		        //pull back the response object
+				return EntityUtils.toByteArray(response.getEntity());
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}				
+		}
+	}
+	
 	private static class XMLHandler<T> extends Handler<T> {
 
 		private Class<T> type;
@@ -248,30 +268,34 @@ Connection: close
 		}
 	}
 	
-	@Override
 	public void remoteShutterTrigger(boolean lock) {
 		// TODO Auto-generated method stub
 	}
 
-	private static CameraProtocol instance = new ICameraProtocol();
+	private static ICameraProtocol instance = new ICameraProtocol();
 
-	public static CameraProtocol getInst() {
+	public static ICameraProtocol getInst() {
 		return instance;
 	}
 
-	@Override
-	public void setControlMode(ControlMode controlMode, int timeoutMS) {
+	public void setControlMode(ControlMode controlMode, int timeoutMS) throws ProtocolError {
 		long startTime = System.currentTimeMillis();
 		long endTime = timeoutMS > 0 ? startTime + timeoutMS : Long.MAX_VALUE;
 		if (controlMode==ControlMode.RemoteShutter) {
+			if (liveViewServer!=null) {
+				liveViewServer.halt();
+				liveViewServer = null;
+			}
 			doGet("http://"+CAMERA_IP+SWITCH_MODE+"?mode=shutter",voidHandler);
 					
 					/*,
 					System.currentTimeMillis()-startTime); */
 		} else {
 			doGet("http://"+CAMERA_IP+SWITCH_MODE + "?mode=rec&lvqty"+maxLiveViewQuality,voidHandler);
-			doGet("http://"+CAMERA_IP+TAKE_MISC + "?com=startliveview&port=50529",voidHandler);
+			doGet("http://"+CAMERA_IP+TAKE_MISC + "?com=startliveview&port="+LV_PORT,voidHandler);
 
+			liveViewServer = new LiveViewServer(LV_PORT, false);
+			
 			// live view request
 			// open udp sockets, create queues...
 		}
@@ -289,51 +313,43 @@ Connection: close
 
 	}
 
-	@Override
 	public ControlMode getControlMode() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 
-	@Override
-	public String getCameraModel() {
+	public String getCameraModel() throws ProtocolError {
 		return doGet("http://" + CAMERA_IP + GET_CAMERA_INFO,
 				new XMLHandler<CamInfo>(CamInfo.class)).getModel();
 	}
 
-	@Override
-	public String getConnectionModel() {
+	public String getConnectionModel() throws ProtocolError {
 		return doGet("http://" + CAMERA_IP + GET_CONNECT_MODE,
 				new XMLHandler<ConnectMode>(ConnectMode.class)).getMode();
 	}
 	
-	@Override
-	public String getCommandList() {
+	public String getCommandList() throws ProtocolError {
 		return doGet("http://" + CAMERA_IP + GET_COMMAND_LIST,
 				new StringHandler());
 	}
 
-	@Override
-	public StartTake startLiveView() {
+	public StartTake startLiveView() throws ProtocolError {
 		return doGet("http://" + CAMERA_IP + TAKE_MOTION + "?com=starttake",
 				new XMLHandler<StartTake>(StartTake.class));
 	}
 
-	@Override
-	public void stopLiveView() {
+	public void stopLiveView() throws ProtocolError {
 		doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=stopliveview",
 				new VoidHandler());
 	}	
 	
-	@Override
-	public void shutdownCamera() {
+	public void shutdownCamera() throws ProtocolError {
 		doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=exec_pwoff",
 				new VoidHandler());
 	}
 
-	@Override
-	public FocusResult setFocusAt(FocusPoint point) {
+	public FocusResult acquireFocus(Point point) throws ProtocolError {
 		FocusResponse response = doGet("http://" + CAMERA_IP + TAKE_MOTION + 
 				"?com=assignafframe&point="+
 				String.format("%010d", point.getX()) + "x" +
@@ -342,64 +358,85 @@ Connection: close
 		
 		return response.getAffocus().equals("ok")
 				? new IFocusResult.IFocusOK(
-						IFocusPoint.parse(response.getAfframepoint()),
-						IFocusArea.parse(response.getAfframesize()))
+						IPoint.parse(response.getAfframepoint()),
+						IDimension.parse(response.getAfframesize()))
 				: new IFocusResult.IFocusError(response.getAffocus());
 	}
 
-	@Override
-	public void releaseFocus() {
+	public void releaseFocus() throws ProtocolError {
 		doGet("http://" + CAMERA_IP + TAKE_MOTION + "?com=releaseafframe",
 			new VoidHandler());
 	}
 
-	@Override
-	public void setIso(ISO iso) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=isospeedvalue",
-				new SetParam(iso.toString()),new VoidHandler());
-	}
-
-	@Override
-	public void setAperture(Aperture aperture) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=focalvalue",
-				new SetParam(aperture.toString()),new VoidHandler());
-	}
-
-	@Override
-	public void setShutterSpeed(ShutterSpeed speed) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=shutspeedvalue",
-				new SetParam(speed.toString()),new VoidHandler());
-	}
-
-	@Override
-	public void setExpComp(ExposureValue ev) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=expcomp",
-				new SetParam(ev.toString()),new VoidHandler());
-	}
-/*
-	@Override
-	public void setWB(WhiteBalance wb) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=wbvalue",
-				new SetParam(wb.toString()),new VoidHandler());
-	}
-
-	@Override
-	public void setArtFilter(ArtFilter artfilter) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=artfilter",
-				new SetParam(artfilter.toString()),new VoidHandler());
+	public Map<String,CameraProperty> getAllProperties() throws ProtocolError {
+		DescList response = doGet("http://" + CAMERA_IP + GET_PROP + 
+				"?com=desc&propname=desclist",
+				new XMLHandler<DescList>(DescList.class));
+		
+		Map<String,CameraProperty> properties = new HashMap<String, CameraProperty>();
+		for (Desc desc : response.getDescriptions()) {
+			String enumTag = desc.getEnumTag();
+			List<String> enumValues = new ArrayList<String>();
+			if (enumTag!=null) {
+				StringTokenizer st = new StringTokenizer(enumTag);
+				while (st.hasMoreElements()) {
+					enumValues.add(st.nextToken());
+				}
+			}
+			properties.put(desc.getPropName(),
+					new ICameraProperty(desc.getPropName(),
+							desc.getValue(),
+							desc.getAttribute(),
+							enumValues));
+		}
+		return properties;
 	}
 	
-	public void setDriveMode(DriveMode driveMode) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=drivemode",
-				new SetParam(driveMode.toString()),new VoidHandler());
-	}*/
+	public CameraProperty getProperty(String propertyName) throws ProtocolError {
+		Desc response = doGet("http://" + CAMERA_IP + GET_PROP + 
+				"?com=desc&propname="+propertyName,
+				new XMLHandler<Desc>(Desc.class));
+		
+		String enumTag = response.getEnumTag();
+		List<String> enumValues = new ArrayList<String>();
+		if (enumTag!=null) {
+			StringTokenizer st = new StringTokenizer(enumTag);
+			while (st.hasMoreElements()) {
+				enumValues.add(st.nextToken());
+			}
+		}
+		return new ICameraProperty(response.getPropName(),
+				response.getValue(),
+				response.getAttribute(),
+				enumValues);
+		
+	}
 	
-	public void setShootingMode(ShootingMode shootingMode) {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname=drivemode",
-				new SetParam(shootingMode.toString()),new VoidHandler());
+	public void setProperty(CameraProperty property) throws ProtocolError {
+		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname="+property.getPropName(),
+				new SetParam(property.getValue()),new VoidHandler());
 	}
 
+	public Frame getNextFrame() throws ProtocolError {
+		return liveViewServer.getNextFrame(1000);		
+	}
+
+	public Image getSmallJpeg() throws ProtocolError {
+		try {
+			byte[] data = doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=getrecview",new BinaryHandler()); 
+			return new IImage(data,JpegUtils.getDimensions(data));
+		} catch (Exception e) {
+			throw new ProtocolError(e.getMessage());
+		}
+	}
 	
-	
+	public Image getFullJPG() throws ProtocolError {
+		try{
+			byte[] data = doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=getlastjpg",new BinaryHandler()); 
+			return new IImage(data,JpegUtils.getDimensions(data));
+		} catch (Exception e) {
+			throw new ProtocolError(e.getMessage());
+		}
+	}
 	
 }

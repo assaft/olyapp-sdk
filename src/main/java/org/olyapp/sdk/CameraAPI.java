@@ -2,14 +2,15 @@ package org.olyapp.sdk;
 
 public interface CameraAPI {
 	
-	String getCameraModel();
-	String getConnectionModel();
-	String getCommandList();
+	String getCameraModel() throws ProtocolError;
+	String getConnectionMode() throws ProtocolError;
+	String getCommandList() throws ProtocolError;
 	
-	ControlMode getMode();
-	LiveViewAPI setLiveViewMode();
-	RemoteShutterAPI setRemoteShutterMode();
+	ControlMode getControlMode() throws ProtocolError;
+	LiveView setLiveViewMode() throws ProtocolError;
+	RemoteShutter setRemoteShutterMode() throws ProtocolError;
+	Play setPlayMode() throws ProtocolError;
 	
-	void shutdownCamera();
+	void shutdownCamera() throws ProtocolError;
 	
 }

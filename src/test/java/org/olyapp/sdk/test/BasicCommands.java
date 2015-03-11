@@ -24,4 +24,9 @@ public class BasicCommands {
 		System.out.println(cameraAPI.getCommandList());
 	}
 	
+	@Test
+	public void testDesc() {
+		CameraAPI cameraAPI = new ICameraAPI();
+		System.out.println(cameraAPI.getPropDesc());
+	}
 }

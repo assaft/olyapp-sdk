@@ -7,7 +7,7 @@ public interface FocusResult {
 	}
 	
 	public interface FocusOK extends FocusResult {
-		FocusPoint getFocusPoint();
-		FocusArea getFocusArea();
+		Point getFocusPoint();
+		Dimensions getFocusArea();
 	}
 }

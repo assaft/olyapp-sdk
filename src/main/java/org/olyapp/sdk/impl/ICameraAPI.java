@@ -2,45 +2,53 @@ package org.olyapp.sdk.impl;
 
 import org.olyapp.sdk.CameraAPI;
 import org.olyapp.sdk.ControlMode;
-import org.olyapp.sdk.LiveViewAPI;
-import org.olyapp.sdk.RemoteShutterAPI;
+import org.olyapp.sdk.LiveView;
+import org.olyapp.sdk.Play;
+import org.olyapp.sdk.ProtocolError;
+import org.olyapp.sdk.RemoteShutter;
 
 public class ICameraAPI implements CameraAPI {
 
 	@Override
-	public String getCameraModel() {
+	public String getCameraModel() throws ProtocolError {
 		return ICameraProtocol.getInst().getCameraModel();
 	}
 
 	@Override
-	public String getConnectionModel() {
+	public String getConnectionMode() throws ProtocolError {
 		return ICameraProtocol.getInst().getConnectionModel();
 	}
 	
 	@Override
-	public String getCommandList() {
+	public String getCommandList() throws ProtocolError {
 		return ICameraProtocol.getInst().getCommandList();
 	}
 
 	@Override
-	public ControlMode getMode() {
+	public ControlMode getControlMode() throws ProtocolError {
 		return ICameraProtocol.getInst().getControlMode();
 	}
 
 	@Override
-	public LiveViewAPI setLiveViewMode() {
+	public LiveView setLiveViewMode() throws ProtocolError {
 		ICameraProtocol.getInst().setControlMode(ControlMode.LiveView,0);
-		return new ILiveViewAPI();
+		return new ILiveView(ICameraProtocol.getInst().getNextFrame().getMetadata());
 	}
 
 	@Override
-	public RemoteShutterAPI setRemoteShutterMode() {
+	public RemoteShutter setRemoteShutterMode() throws ProtocolError {
 		ICameraProtocol.getInst().setControlMode(ControlMode.RemoteShutter,0);
-		return new IRemoteShutterAPI();
+		return new IRemoteShutter();
 	}
 
 	@Override
-	public void shutdownCamera() {
+	public Play setPlayMode() throws ProtocolError {
+		ICameraProtocol.getInst().setControlMode(ControlMode.Play,0);
+		return new IPlay();
+	}
+	
+	@Override
+	public void shutdownCamera() throws ProtocolError {
 		ICameraProtocol.getInst().shutdownCamera();
 	}
 

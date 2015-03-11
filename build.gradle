@@ -29,4 +29,5 @@ repositories {
 
 dependencies {
 	compile 'org.apache.httpcomponents:httpclient:4.4'
+	compile "org.projectlombok:lombok:1.16.2"
 }
