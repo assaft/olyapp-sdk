@@ -139,7 +139,7 @@ public class ILiveView implements LiveView {
 
 	@Override
 	public LiveViewShot shoot() throws ProtocolError {
-		return new ILiveViewShot(ICameraProtocol.getInst().getSmallJpeg());
+		return ICameraProtocol.getInst().shootLiveView(); 
 	}
 
 	@Override

@@ -7,7 +7,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.StringTokenizer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
@@ -27,9 +30,12 @@ import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.util.EntityUtils;
 import org.olyapp.sdk.CameraProperty;
 import org.olyapp.sdk.ControlMode;
+import org.olyapp.sdk.Dimensions;
 import org.olyapp.sdk.FocusResult;
 import org.olyapp.sdk.Frame;
 import org.olyapp.sdk.Image;
+import org.olyapp.sdk.LiveViewControl;
+import org.olyapp.sdk.LiveViewShot;
 import org.olyapp.sdk.Point;
 import org.olyapp.sdk.ProtocolError;
 import org.olyapp.sdk.lvsrv.LiveViewServer;
@@ -45,18 +51,31 @@ import org.olyapp.sdk.xml.StartTake;
 
 public class ICameraProtocol {
 
+	private static final String 		DEF_CAMERA_IP = "192.168.0.10";
 
-	private static final String CAMERA_IP = "192.168.0.10";
+	private static final int 			DEF_LIVEVIEW_PORT 	= 50529;
+	private static final Dimensions 	DEF_LIVEVIEW_RES  	= new IDimension(640,480);
+	private static final int			DEF_CONTROL_TO_MS	= 1000;
+	private static final int			DEF_STREAM_TO_MS	= 1000;
+	private static final boolean		DEF_DEBUG_CONTROL	= false;
+	private static final boolean		DEF_DEBUG_STREAM	= false;
+	private static final LiveViewControl DEF_LIVEVIEW_CONTROL = LiveViewControl.SemiAutomatic;
 	
-	private static final int 	LV_PORT = 50529;
-
-	private static final String CHAR_SET = "ISO-8859-1";
+	private static final String			KEY_LIVEVIEW_PORT 	= "LiveViewPort";
+	private static final String 		KEY_LIVEVIEW_RES  	= "LiveViewDefResolution";
+	private static final String			KEY_CONTROL_TO_MS	= "HTTPTimeoutMS";
+	private static final String			KEY_STREAM_TO_MS	= "FrameTimeoutMS";
+	private static final String			KEY_DEBUG_CONTROL	= "DebugControl";
+	private static final String			KEY_DEBUG_STREAM	= "DebugStream";
+	private static final String			KEY_LIVEVIEW_CONTROL= "LiveViewControl"; 
+	
+	private static final String 		DEF_XML_CHAR_SET = "ISO-8859-1";
 	
 	private static final String GET_CAMERA_INFO = "/get_caminfo.cgi";
 	private static final String GET_CONNECT_MODE = "/get_connectmode.cgi";
 	private static final String GET_COMMAND_LIST = "/get_commandlist.cgi";
 	private static final String SWITCH_MODE = "/switch_cammode.cgi";  // ?mode=play
-	private static final String SET_TIME = "/set_utctimediff.cgi"; //?utctime=20150227T103539&diff=%2B0200
+	//private static final String SET_TIME = "/set_utctimediff.cgi"; //?utctime=20150227T103539&diff=%2B0200
 	//private static final String /switch_cammode.cgi?mode=rec&lvqty=0640x0480
 	private static final String GET_PROP = "/get_camprop.cgi"; //
 	private static final String SET_PROP = "/set_camprop.cgi";
@@ -68,7 +87,7 @@ public class ICameraProtocol {
 	private static final JAXBContext jaxbContext = initContext();
 	private static final Unmarshaller jaxbUnmarshaller = initUnmarshaller();
 	private static final Marshaller jaxbMarshaller = initMarshaller(); 
-			
+	
     private static JAXBContext initContext() {
         try {
 			return JAXBContext.newInstance(
@@ -88,7 +107,7 @@ public class ICameraProtocol {
 	private static Marshaller initMarshaller() {
 		try {
 			Marshaller marshaller = jaxbContext.createMarshaller();
-		    marshaller.setProperty(Marshaller.JAXB_ENCODING, CHAR_SET);
+		    marshaller.setProperty(Marshaller.JAXB_ENCODING, DEF_XML_CHAR_SET);
 			return jaxbContext.createMarshaller();
 		} catch (JAXBException e) {
 			e.printStackTrace();
@@ -105,14 +124,26 @@ public class ICameraProtocol {
 		}
 	}
 
-
+	private static ICameraProtocol instance = null;
+	
+	public static void init(Properties settings) throws ProtocolError {
+		if (instance==null) {
+			instance = new ICameraProtocol(settings);
+		} else {
+			throw new ProtocolError("Camera protocol has already been initialized");
+		}
+	}
+	
+	public static void init() throws ProtocolError {
+		init(null);
+	}
+	
+	public static ICameraProtocol getInst() {
+		return instance;
+	}
+	
+	
 	/*
-	 *
-	 * 
-	 * 
-	 * 
-
-
 
 GET /exec_takemotion.cgi?com=starttake HTTP/1.1
 Host: 192.168.0.10
@@ -126,30 +157,55 @@ Connection: close
 
 <?xml version="1.0"?><response><take>ok</take><affocus>ok</affocus><afframepoint>0412x0346</afframepoint><afframesize>0072x0072</afframesize></response>
 
-
-	 * 
-	 * 
-	 * 
-	
 	<?xml version="1.0"?><response><take>ok</take><affocus>ok</affocus><afframepoint>0412x0346</afframepoint><afframesize>0072x0072</afframesize></response>
 			
 	exec_takemisc.cgi?com=getrecview -> small jpeg
 	exec_takemisc.cgi?com=getlastjpg -> big jpeg
-	
 
 	*/
 	
 	//http://192.168.0.10/exec_takemotion.cgi?com=assignafframe&point=0448x0383
 	
+	private final RequestConfig requestConfig;
+	private final VoidHandler voidHandler;
 
-	private String maxLiveViewQuality = "0640x0480"; 
+	private final LiveViewServer liveViewServer;
+	private ControlMode currentControlMode;
+	private Dimensions liveViewRes; 
 	
-	private final RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(3 * 1000).build();
-	private final VoidHandler voidHandler = new VoidHandler();
+	private final int controlTimeoutMS;
+	private final int streamTimeoutMS;
+	
+	private final boolean debugControl;
+	private final boolean debugStream;
+	
+	private LiveViewControl liveViewControl;
+	private boolean liveViewStarted;
 
-	private LiveViewServer liveViewServer; 
-	
-	private ICameraProtocol() {
+	private ICameraProtocol(Properties settings) throws ProtocolError {
+		int port;
+		if (settings==null) {
+			port = DEF_LIVEVIEW_PORT;
+			liveViewRes = DEF_LIVEVIEW_RES;
+			debugControl = DEF_DEBUG_CONTROL;
+			debugStream = DEF_DEBUG_STREAM;
+			controlTimeoutMS = DEF_CONTROL_TO_MS;
+			streamTimeoutMS = DEF_STREAM_TO_MS;
+			liveViewControl = DEF_LIVEVIEW_CONTROL;
+		} else {
+			port = Integer.parseInt(settings.getProperty(KEY_LIVEVIEW_PORT,Integer.toString(DEF_LIVEVIEW_PORT)));
+			liveViewRes = IDimension.parse(settings.getProperty(KEY_LIVEVIEW_RES,DEF_LIVEVIEW_RES.toString()));
+			debugControl = Boolean.parseBoolean(settings.getProperty(KEY_DEBUG_CONTROL,Boolean.toString(DEF_DEBUG_CONTROL)));
+			debugStream = Boolean.parseBoolean(settings.getProperty(KEY_DEBUG_STREAM,Boolean.toString(DEF_DEBUG_STREAM)));
+			controlTimeoutMS = Integer.parseInt(settings.getProperty(KEY_CONTROL_TO_MS,Integer.toString(DEF_CONTROL_TO_MS))); 
+			streamTimeoutMS = Integer.parseInt(settings.getProperty(KEY_STREAM_TO_MS,Integer.toString(DEF_STREAM_TO_MS))); 
+			liveViewControl = LiveViewControl.valueOf(settings.getProperty(KEY_LIVEVIEW_CONTROL,DEF_LIVEVIEW_CONTROL.toString()));
+		}
+		liveViewServer = new LiveViewServer(port, debugStream);
+		currentControlMode = ControlMode.UnSet;
+		liveViewStarted = false;
+		requestConfig = RequestConfig.custom().setConnectTimeout(controlTimeoutMS).build();
+		voidHandler = new VoidHandler();
 	}
 	
 	private <T> T doGet(String s, Handler<T> handler) throws ProtocolError {
@@ -161,7 +217,7 @@ Connection: close
 			StringWriter sw = new StringWriter();
 			jaxbMarshaller.marshal(o, sw);
 			HttpPost httppost = new HttpPost(s);
-			httppost.setEntity(new StringEntity(sw.toString(),CHAR_SET));
+			httppost.setEntity(new StringEntity(sw.toString(),DEF_XML_CHAR_SET));
 			return request(httppost,handler);
 		} catch (JAXBException e) {
 			e.printStackTrace();
@@ -171,10 +227,16 @@ Connection: close
 	}
 	
 	private <T> T request(HttpUriRequest httpRequest, Handler<T> handler) throws ProtocolError {
+		if (debugControl) {
+			System.out.println("Requesting: " + httpRequest.getURI());
+		}
 		CloseableHttpClient httpclient = HttpClientBuilder.create().setDefaultRequestConfig(requestConfig).build();
 		CloseableHttpResponse response = null;
 		try {
 			response = httpclient.execute(httpRequest);
+			if (debugControl) {
+				System.out.println("Received: " + response.getStatusLine());
+			}
 	        int statusCode = response.getStatusLine().getStatusCode();
 	        if (statusCode != 200) {
 	            throw new ProtocolError("Failed with HTTP error code : " + statusCode);
@@ -194,11 +256,9 @@ Connection: close
 		}
 	}
 
-
 	private abstract static class Handler<T> {
 		abstract T handleResponse(HttpResponse response);
 	}
-	
 	
 	private static class VoidHandler extends Handler<Void> {
 		@Override
@@ -238,10 +298,10 @@ Connection: close
 	
 	private static class XMLHandler<T> extends Handler<T> {
 
-		private Class<T> type;
+		//private Class<T> type;
 		
 		public XMLHandler(Class<T> type) {
-			this.type = type;
+		//	this.type = type;
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -272,85 +332,106 @@ Connection: close
 		// TODO Auto-generated method stub
 	}
 
-	private static ICameraProtocol instance = new ICameraProtocol();
-
-	public static ICameraProtocol getInst() {
-		return instance;
-	}
-
-	public void setControlMode(ControlMode controlMode, int timeoutMS) throws ProtocolError {
-		long startTime = System.currentTimeMillis();
-		long endTime = timeoutMS > 0 ? startTime + timeoutMS : Long.MAX_VALUE;
-		if (controlMode==ControlMode.RemoteShutter) {
-			if (liveViewServer!=null) {
-				liveViewServer.halt();
-				liveViewServer = null;
+	public void setControlMode(ControlMode controlMode) throws ProtocolError {
+		if (controlMode!=currentControlMode) {
+			if (currentControlMode==ControlMode.LiveView && liveViewControl!=LiveViewControl.Manual) {
+				stopLiveView();
 			}
-			doGet("http://"+CAMERA_IP+SWITCH_MODE+"?mode=shutter",voidHandler);
-					
-					/*,
-					System.currentTimeMillis()-startTime); */
-		} else {
-			doGet("http://"+CAMERA_IP+SWITCH_MODE + "?mode=rec&lvqty"+maxLiveViewQuality,voidHandler);
-			doGet("http://"+CAMERA_IP+TAKE_MISC + "?com=startliveview&port="+LV_PORT,voidHandler);
-
-			liveViewServer = new LiveViewServer(LV_PORT, false);
-			
-			// live view request
-			// open udp sockets, create queues...
-		}
-
-		long remainingTime;
-		while (System.currentTimeMillis()>endTime && getControlMode()!=controlMode) {
-			if ((remainingTime = System.currentTimeMillis()-endTime)>0) {
-				//				Thread.sleep(Math.min(200, remainingTime));
+			switch (controlMode) {
+			case LiveView:
+				doGet("http://"+DEF_CAMERA_IP+SWITCH_MODE + "?mode=rec&lvqty"+liveViewRes.toString(),voidHandler);
+				break;
+			case Play:
+				doGet("http://"+DEF_CAMERA_IP+SWITCH_MODE+"?mode=play",voidHandler);
+				break;
+			case RemoteShutter:
+				doGet("http://"+DEF_CAMERA_IP+SWITCH_MODE+"?mode=shutter",voidHandler);
+				break;
+			default:
+				break;
+			}
+			currentControlMode = controlMode;
+			if (currentControlMode==ControlMode.LiveView && liveViewControl!=LiveViewControl.Manual) {
+				startLiveView();
 			}
 		}
-
-		if (getControlMode()!=controlMode) {
-			//throw new TimeoutExpired();
-		}
-
 	}
 
 	public ControlMode getControlMode() {
-		// TODO Auto-generated method stub
-		return null;
+		return currentControlMode;
+	}
+	
+	public List<Dimensions> getLiveViewResolutions() throws ProtocolError {
+		String commandList = getCommandList();
+		int lvqtyIndex = commandList.indexOf("\"lvqty\"");
+		if (lvqtyIndex==-1) {
+			throw new ProtocolError("Failed to read live view resolutions");
+		}
+		
+		int openingBracket = commandList.lastIndexOf('<', lvqtyIndex);
+		if (lvqtyIndex==-1) {
+			throw new ProtocolError("Failed to read live view resolutions");
+		}
+
+		String tagName = commandList.substring(openingBracket,commandList.indexOf(' ', openingBracket));
+
+		int endingBracket = commandList.indexOf("<" + tagName + "/>",openingBracket);
+		if (lvqtyIndex==-1) {
+			throw new ProtocolError("Failed to read live view resolutions");
+		}
+
+		String lvqty = commandList.substring(openingBracket,endingBracket);
+
+		List<Dimensions> dimensions = new ArrayList<Dimensions>();		
+		
+		Pattern lvqtyPattern = Pattern.compile("\\\"(.*)x(.*)\\\"");
+		Matcher matcher = lvqtyPattern.matcher(lvqty);
+		while(matcher.find()) {
+			dimensions.add(new IDimension(
+					Integer.parseInt(matcher.group(1)),
+					Integer.parseInt(matcher.group(2))));
+			
+			System.out.println("found: " + matcher.group(1) +
+                               " "       + matcher.group(2));
+        }
+		return dimensions;
 	}
 
-
+	public void setLiveViewResolution(Dimensions res) {
+		liveViewRes  = res;
+	}
+	
 	public String getCameraModel() throws ProtocolError {
-		return doGet("http://" + CAMERA_IP + GET_CAMERA_INFO,
+		return doGet("http://" + DEF_CAMERA_IP + GET_CAMERA_INFO,
 				new XMLHandler<CamInfo>(CamInfo.class)).getModel();
 	}
 
 	public String getConnectionModel() throws ProtocolError {
-		return doGet("http://" + CAMERA_IP + GET_CONNECT_MODE,
+		return doGet("http://" + DEF_CAMERA_IP + GET_CONNECT_MODE,
 				new XMLHandler<ConnectMode>(ConnectMode.class)).getMode();
 	}
 	
 	public String getCommandList() throws ProtocolError {
-		return doGet("http://" + CAMERA_IP + GET_COMMAND_LIST,
-				new StringHandler());
+		return doGet("http://" + DEF_CAMERA_IP + GET_COMMAND_LIST, new StringHandler());
 	}
 
-	public StartTake startLiveView() throws ProtocolError {
-		return doGet("http://" + CAMERA_IP + TAKE_MOTION + "?com=starttake",
-				new XMLHandler<StartTake>(StartTake.class));
-	}
+	public void startLiveView() throws ProtocolError {
+		int port = liveViewServer.getPort();
+		doGet("http://"+DEF_CAMERA_IP+TAKE_MISC + "?com=startliveview&port="+port,voidHandler);
+		liveViewStarted = true;
+	}	
 
 	public void stopLiveView() throws ProtocolError {
-		doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=stopliveview",
-				new VoidHandler());
+		doGet("http://" + DEF_CAMERA_IP + TAKE_MISC + "?com=stopliveview",voidHandler);
+		liveViewStarted = false;
 	}	
 	
 	public void shutdownCamera() throws ProtocolError {
-		doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=exec_pwoff",
-				new VoidHandler());
+		doGet("http://" + DEF_CAMERA_IP + TAKE_MISC + "?com=exec_pwoff",voidHandler);
 	}
 
 	public FocusResult acquireFocus(Point point) throws ProtocolError {
-		FocusResponse response = doGet("http://" + CAMERA_IP + TAKE_MOTION + 
+		FocusResponse response = doGet("http://" + DEF_CAMERA_IP + TAKE_MOTION + 
 				"?com=assignafframe&point="+
 				String.format("%010d", point.getX()) + "x" +
 				String.format("%010d", point.getY()),
@@ -364,15 +445,14 @@ Connection: close
 	}
 
 	public void releaseFocus() throws ProtocolError {
-		doGet("http://" + CAMERA_IP + TAKE_MOTION + "?com=releaseafframe",
-			new VoidHandler());
+		doGet("http://" + DEF_CAMERA_IP + TAKE_MOTION + "?com=releaseafframe",voidHandler);
 	}
 
 	public Map<String,CameraProperty> getAllProperties() throws ProtocolError {
-		DescList response = doGet("http://" + CAMERA_IP + GET_PROP + 
+		DescList response = doGet("http://" + DEF_CAMERA_IP + GET_PROP + 
 				"?com=desc&propname=desclist",
 				new XMLHandler<DescList>(DescList.class));
-		
+
 		Map<String,CameraProperty> properties = new HashMap<String, CameraProperty>();
 		for (Desc desc : response.getDescriptions()) {
 			String enumTag = desc.getEnumTag();
@@ -393,7 +473,7 @@ Connection: close
 	}
 	
 	public CameraProperty getProperty(String propertyName) throws ProtocolError {
-		Desc response = doGet("http://" + CAMERA_IP + GET_PROP + 
+		Desc response = doGet("http://" + DEF_CAMERA_IP + GET_PROP + 
 				"?com=desc&propname="+propertyName,
 				new XMLHandler<Desc>(Desc.class));
 		
@@ -413,30 +493,49 @@ Connection: close
 	}
 	
 	public void setProperty(CameraProperty property) throws ProtocolError {
-		doPost("http://" + CAMERA_IP + SET_PROP + "?com=set&propname="+property.getPropName(),
-				new SetParam(property.getValue()),new VoidHandler());
+		doPost("http://" + DEF_CAMERA_IP + SET_PROP + "?com=set&propname="+property.getPropName(),
+				new SetParam(property.getValue()),voidHandler);
 	}
 
 	public Frame getNextFrame() throws ProtocolError {
-		return liveViewServer.getNextFrame(1000);		
+		return liveViewServer.getNextFrame(streamTimeoutMS);		
 	}
 
-	public Image getSmallJpeg() throws ProtocolError {
+	public Image getJpeg(String command) throws ProtocolError {
 		try {
-			byte[] data = doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=getrecview",new BinaryHandler()); 
+			boolean liveViewStopped = false;
+			if (liveViewStarted && liveViewControl==LiveViewControl.Automatic) {
+				stopLiveView();
+				liveViewStopped = true;
+			}
+			byte[] data = doGet("http://" + DEF_CAMERA_IP + TAKE_MISC + "?com="+command,new BinaryHandler()); 
+			if (liveViewStopped) {
+				startLiveView();
+			}
 			return new IImage(data,JpegUtils.getDimensions(data));
 		} catch (Exception e) {
 			throw new ProtocolError(e.getMessage());
 		}
 	}
 	
-	public Image getFullJPG() throws ProtocolError {
-		try{
-			byte[] data = doGet("http://" + CAMERA_IP + TAKE_MISC + "?com=getlastjpg",new BinaryHandler()); 
-			return new IImage(data,JpegUtils.getDimensions(data));
-		} catch (Exception e) {
-			throw new ProtocolError(e.getMessage());
-		}
+	public Image getSmallJpeg() throws ProtocolError {
+		return getJpeg("getrecview");
+	}
+		
+	public Image getFullJpeg() throws ProtocolError {
+		return getJpeg("getlastjpg");
+	}
+
+	public LiveViewShot shootLiveView() throws ProtocolError {
+		StartTake response = doGet("http://" + DEF_CAMERA_IP + TAKE_MOTION + "?com=starttake",
+				new XMLHandler<StartTake>(StartTake.class));
+		return new ILiveViewShot(
+				response.getTake(),
+				response.getAffocus().equals("ok")
+					? new IFocusResult.IFocusOK(
+							IPoint.parse(response.getAfframepoint()),
+							IDimension.parse(response.getAfframesize()))
+					: new IFocusResult.IFocusError(response.getAffocus()));
 	}
 	
 }

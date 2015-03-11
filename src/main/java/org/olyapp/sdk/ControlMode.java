@@ -1,5 +1,5 @@
 package org.olyapp.sdk;
 
 public enum ControlMode {
-	LiveView, RemoteShutter, Play; 
+	UnSet, LiveView, RemoteShutter, Play; 
 }

@@ -33,19 +33,26 @@ public class LiveViewServer extends Thread {
 	
 	private Map<Integer,ImageBuffer> receivedImageData;
 
-	private AtomicBoolean stop;
-	DatagramSocket serverSocket;
+	private AtomicBoolean halt;
+	private AtomicBoolean error;
+	
+	private DatagramSocket serverSocket;
 	
 	private SynchronousQueue<ImageBuffer> readyImageQ;
 	
-	public LiveViewServer(int port, boolean debugMode) throws SocketException {
-		this.port = port;
-		this.debugMode = debugMode;
-		receivedImageData = new HashMap<Integer, ImageBuffer>();
-		stop = new AtomicBoolean(false);		
-		readyImageQ = new SynchronousQueue<ImageBuffer>();
-		initSocket();
-		start();
+	public LiveViewServer(int port, boolean debugMode) throws ProtocolError {
+		try {
+			this.port = port;
+			this.debugMode = debugMode;
+			receivedImageData = new HashMap<Integer, ImageBuffer>();
+			halt = new AtomicBoolean(false);
+			error = new AtomicBoolean(false);
+			readyImageQ = new SynchronousQueue<ImageBuffer>();
+			initSocket();
+			start();
+		} catch (Exception e) {
+			throw new ProtocolError(e.getMessage());
+		}
 	}
 	
 	private void initSocket() throws SocketException {
@@ -60,7 +67,7 @@ public class LiveViewServer extends Thread {
 		
 		System.out.println("Motion JPEG UDP Server - Entering mainloop");
 		
-		while(!stop.get()) {
+		while(!halt.get() && !error.get()) {
 			DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
 			try {
 				serverSocket.receive(receivePacket);
@@ -149,7 +156,7 @@ public class LiveViewServer extends Thread {
 					initSocket();
 				} catch (SocketException e1) {
 					e1.printStackTrace();
-					throw new RuntimeException(e);
+					error();
 				}
 			}
 		}
@@ -157,28 +164,44 @@ public class LiveViewServer extends Thread {
 	}
 	
 	public void halt() {
-		stop.set(true);
+		halt.set(true);
+	}
+	
+	public void error() {
+		error.set(true);
 	}
 	
 	public Frame getNextFrame(int ms) throws ProtocolError {
-		try {
-			ImageBuffer image = readyImageQ.poll(ms,TimeUnit.MILLISECONDS);
-			Frame frame = null;
-			if (image!=null) {
-				byte[] metadata = image.getMetadata();
-				Dimensions dimension = JpegUtils.getDimensions(metadata);
-				Fraction shutterSpeed 	= new IFraction((metadata[0x64]<<8) | metadata[0x65], (metadata[0x66]<<8) | metadata[0x67]);
-				Fraction aperture 		= new IFraction((metadata[0x76]<<8) | metadata[0x77], (metadata[0x78]<<8) | metadata[0x79]);
-				int expComp				= ~(metadata[0x84]<<24 + metadata[0x85]<<16 + metadata[0x86]<<8 + metadata[0x87]);
-				FrameMetadata frameMetadata = new IFrameMetadata(
-						dimension, 
-						shutterSpeed,aperture,expComp,
-						false,0,false,0,false,0,new IFraction(0,0),0,false,0,false);
-				frame = new IFrame(frameMetadata,image.getImage());
+		if (!error.get()) {
+			try {
+				ImageBuffer image = readyImageQ.poll(ms,TimeUnit.MILLISECONDS);
+				Frame frame = null;
+				if (image!=null) {
+					byte[] metadata = image.getMetadata();
+					Dimensions dimension = JpegUtils.getDimensions(metadata);
+					Fraction shutterSpeed 	= new IFraction((metadata[0x64]<<8) | metadata[0x65], (metadata[0x66]<<8) | metadata[0x67]);
+					Fraction aperture 		= new IFraction((metadata[0x76]<<8) | metadata[0x77], (metadata[0x78]<<8) | metadata[0x79]);
+					int expComp				= ~(metadata[0x84]<<24 + metadata[0x85]<<16 + metadata[0x86]<<8 + metadata[0x87]);
+					FrameMetadata frameMetadata = new IFrameMetadata(
+							dimension, 
+							shutterSpeed,aperture,expComp,
+							false,0,false,0,false,0,new IFraction(0,0),0,false,0,false);
+					frame = new IFrame(frameMetadata,image.getImage());
+				}
+				return frame;
+			} catch (Exception e) {
+				throw new ProtocolError(e.getMessage());
 			}
-			return frame;
-		} catch (Exception e) {
-			throw new ProtocolError(e.getMessage());
+		} else {
+			throw new ProtocolError("General error in UDP Server");
+		}
+	}
+
+	public int getPort() throws ProtocolError {
+		if (!error.get()) {
+			return port;
+		} else {
+			throw new ProtocolError("General error in UDP Server");
 		}
 	}
 

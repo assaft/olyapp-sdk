@@ -17,4 +17,7 @@ public class IDimension implements Dimensions {
 				Integer.parseInt(dimensionStr.substring(xPos+1)));
 	}
 
+	public String toString() {
+		return String.format("%04dx%04d",width,height);
+	}
 }

@@ -31,19 +31,19 @@ public class ICameraAPI implements CameraAPI {
 
 	@Override
 	public LiveView setLiveViewMode() throws ProtocolError {
-		ICameraProtocol.getInst().setControlMode(ControlMode.LiveView,0);
+		ICameraProtocol.getInst().setControlMode(ControlMode.LiveView);
 		return new ILiveView(ICameraProtocol.getInst().getNextFrame().getMetadata());
 	}
 
 	@Override
 	public RemoteShutter setRemoteShutterMode() throws ProtocolError {
-		ICameraProtocol.getInst().setControlMode(ControlMode.RemoteShutter,0);
+		ICameraProtocol.getInst().setControlMode(ControlMode.RemoteShutter);
 		return new IRemoteShutter();
 	}
 
 	@Override
 	public Play setPlayMode() throws ProtocolError {
-		ICameraProtocol.getInst().setControlMode(ControlMode.Play,0);
+		ICameraProtocol.getInst().setControlMode(ControlMode.Play);
 		return new IPlay();
 	}
 	
