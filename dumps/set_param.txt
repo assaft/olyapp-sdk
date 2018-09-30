@@ -1,0 +1,10 @@
+POST /set_camprop.cgi?prop=set&propname=focalvalue HTTP/1.0
+Connection: keep-alive
+Content-Type: text/xml; charset=us-ascii
+Content-Length: 50
+Host: oishare
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Encoding: identity
+User-Agent: Mozilla/3.0 (compatible; Indy Library)
+
+<?xml version="1.0"?><set><value>5.6</value></set>

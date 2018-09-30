@@ -1,0 +1,29 @@
+
+Switch to live-view mode:
+http://192.168.0.10/switch_cammode.cgi?mode=rec&lvqty=0640x0480
+http://192.168.0.10/exec_takemisc.cgi?com=startliveview&port=28488
+http://192.168.0.10/exec_takemisc.cgi?com=stopliveview
+
+Read parameters:
+http://192.168.0.10/switch_cammode.cgi?mode=rec&lvqty=0640x0480
+http://192.168.0.10/get_camprop.cgi?prop=desc&propname=takemode
+http://192.168.0.10/get_camprop.cgi?prop=desc&propname=shutspeedvalue
+http://192.168.0.10/get_camprop.cgi?prop=desc&propname=isospeedvalue
+http://192.168.0.10/get_camprop.cgi?prop=desc&propname=focalvalue
+http://192.168.0.10/get_camprop.cgi?prop=desc&propname=lowvibtime
+
+Set parameters
+
+
+Switch to shutter mode and take picture:
+http://192.168.0.10/switch_cammode.cgi?mode=shutter
+http://192.168.0.10/exec_shutter.cgi?com=1st2ndpush
+http://192.168.0.10/exec_shutter.cgi?com=2nd1strelease
+
+
+Read Dir:
+http://192.168.0.10/switch_cammode.cgi?mode=play
+http://192.168.0.10/get_imglist.cgi?DIR=/DCIM
+http://192.168.0.10/get_imglist.cgi?DIR=/DCIM/100OLYMP
+=>...
+

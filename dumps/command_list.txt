@@ -1,0 +1,236 @@
+GET /get_commandlist.cgi HTTP/1.1
+Host: oishare
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Encoding: identity
+User-Agent: Mozilla/3.0 (compatible; Indy Library)
+
+HTTP/1.1 200 OK
+Content-Type: text/xml
+Content-Length: 5616
+Connection: close
+
+<?xml version="1.0"?>
+<oishare>
+ <version>2.20</version>
+ <support func="web"/>
+ <support func="remote"/>
+ <support func="gps"/>
+ <support func="release"/>
+ <cgi name="get_connectmode">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="switch_cammode">
+  <http_method type="get">
+   <cmd1 name="mode">
+    <param1 name="rec">
+     <cmd2 name="lvqty">
+      <param2 name="0320x0240"/>
+      <param2 name="0640x0480"/>
+     </cmd2>
+    </param1>
+    <param1 name="play"/>
+    <param1 name="shutter">
+     <cmd2 name="lvqty">
+      <param2 name="0320x0240"/>
+      <param2 name="0640x0480"/>
+     </cmd2>
+    </param1>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="get_caminfo">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="exec_pwoff">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="get_resizeimg">
+  <http_method type="get">
+   <cmd1 name="DIR">
+    <param1>
+     <cmd2 name="size">
+      <param2 name="1024"/>
+      <param2 name="1600"/>
+      <param2 name="1920"/>
+      <param2 name="2048"/>
+     </cmd2>
+    </param1>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="get_movplaytime">
+  <http_method type="get">
+   <cmd1 name="DIR"/>
+  </http_method>
+ </cgi>
+ <cgi name="clear_resvflg">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="get_rsvimglist">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="get_imglist">
+  <http_method type="get">
+   <cmd1 name="DIR"/>
+  </http_method>
+ </cgi>
+ <cgi name="get_thumbnail">
+  <http_method type="get">
+   <cmd1 name="DIR"/>
+  </http_method>
+ </cgi>
+ <cgi name="exec_takemotion">
+  <http_method type="get">
+   <cmd1 name="com">
+    <param1 name="assignafframe">
+     <cmd2 name="point"/>
+    </param1>
+    <param1 name="releaseafframe"/>
+    <param1 name="takeready">
+     <cmd2 name="point"/>
+    </param1>
+    <param1 name="starttake">
+     <cmd2 name="point">
+      <cmd3 name="exposuremin"/>
+      <cmd3 name="upperlimit"/>
+     </cmd2>
+    </param1>
+    <param1 name="stoptake"/>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="exec_takemisc">
+  <http_method type="get">
+   <cmd1 name="com">
+    <param1 name="startliveview">
+     <cmd2 name="port"/>
+    </param1>
+    <param1 name="stopliveview"/>
+    <param1 name="getrecview"/>
+    <param1 name="getlastjpg"/>
+    <param1 name="ctrlzoom">
+     <cmd2 name="move">
+      <param2 name="widemove"/>
+      <param2 name="telemove"/>
+      <param2 name="off"/>
+      <param2 name="wideterm"/>
+      <param2 name="teleterm"/>
+     </cmd2>
+    </param1>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="get_camprop">
+  <http_method type="get">
+   <cmd1 name="com">
+    <param1 name="desc">
+     <cmd2 name="propname">
+      <param2 name="touchactiveframe"/>
+      <param2 name="takemode"/>
+      <param2 name="drivemode"/>
+      <param2 name="focalvalue"/>
+      <param2 name="expcomp"/>
+      <param2 name="shutspeedvalue"/>
+      <param2 name="isospeedvalue"/>
+      <param2 name="wbvalue"/>
+      <param2 name="noisereduction"/>
+      <param2 name="lowvibtime"/>
+      <param2 name="bulbtimelimit"/>
+      <param2 name="artfilter"/>
+      <param2 name="digitaltelecon"/>
+      <param2 name="desclist"/>
+     </cmd2>
+    </param1>
+    <param1 name="get">
+     <cmd2 name="propname">
+      <param2 name="touchactiveframe"/>
+      <param2 name="takemode"/>
+      <param2 name="drivemode"/>
+      <param2 name="focalvalue"/>
+      <param2 name="expcomp"/>
+      <param2 name="shutspeedvalue"/>
+      <param2 name="isospeedvalue"/>
+      <param2 name="wbvalue"/>
+      <param2 name="noisereduction"/>
+      <param2 name="lowvibtime"/>
+      <param2 name="bulbtimelimit"/>
+      <param2 name="artfilter"/>
+      <param2 name="digitaltelecon"/>
+      <param2 name="desclist"/>
+     </cmd2>
+    </param1>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="set_camprop">
+  <http_method type="post">
+   <cmd1 name="com">
+    <param1 name="set">
+     <cmd2 name="propname">
+      <param2 name="takemode"/>
+      <param2 name="drivemode"/>
+      <param2 name="focalvalue"/>
+      <param2 name="expcomp"/>
+      <param2 name="shutspeedvalue"/>
+      <param2 name="isospeedvalue"/>
+      <param2 name="wbvalue"/>
+      <param2 name="artfilter"/>
+     </cmd2>
+    </param1>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="get_activate">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="set_utctimediff">
+  <http_method type="get">
+   <cmd1 name="utctime">
+    <cmd2 name="diff"/>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="get_gpsdivunit">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="get_unusedcapacity">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="get_dcffilenum">
+  <http_method type="get"/>
+ </cgi>
+ <cgi name="req_attachexifgps">
+  <http_method type="post"/>
+ </cgi>
+ <cgi name="req_storegpsinfo">
+  <http_method type="post">
+   <cmd1 name="mode">
+    <param1 name="new"/>
+    <param1 name="append"/>
+    <cmd2 name="date"/>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="exec_shutter">
+  <http_method type="get">
+   <cmd1 name="com">
+    <param1 name="1stpush"/>
+    <param1 name="2ndpush"/>
+    <param1 name="1st2ndpush"/>
+    <param1 name="2nd1strelease"/>
+    <param1 name="2ndrelease"/>
+    <param1 name="1strelease"/>
+   </cmd1>
+  </http_method>
+ </cgi>
+ <cgi name="exec_shuttermisc">
+  <http_method type="get">
+   <cmd1 name="com">
+    <param1 name="startliveview">
+     <cmd2 name="port" />
+    </param1>
+    <param1 name="stopliveview" />
+   </cmd1>
+  </http_method>
+ </cgi>
+</oishare>

@@ -1,33 +1,27 @@
-apply plugin: 'java'
-apply plugin: 'eclipse'
+plugins {
+    id 'java'
+	id 'eclipse'
+    id 'io.franzbecker.gradle-lombok' version '1.14'
+}
 
-sourceCompatibility = 1.6
+sourceCompatibility = 1.8
 version = '0.1'
-
-task wrapper(type: Wrapper) {
-    gradleVersion = '1.11'
-}
-
-//create a single Jar with all dependencies
-task packjar(type: Jar) {
-	manifest {
-        attributes 'Implementation-Title': 'SDK for developing oly apps',  
-        	'Implementation-Version': version
-        
-    }
-    baseName = project.name + '-all'
-    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-    with jar
-}
-
-
-
 
 repositories {
     mavenCentral()
 }
 
+lombok {
+	version = '1.18.2'
+	sha256 = ""
+}
+
+wrapper {
+    gradleVersion = '4.7'
+}
+
 dependencies {
-	compile 'org.apache.httpcomponents:httpclient:4.4'
-	compile "org.projectlombok:lombok:1.16.2"
+	compile 'org.apache.httpcomponents:httpclient:4.5.6'
+	compile 'com.google.guava:guava:11.0.2'
+	testCompile "junit:junit:4.12"
 }
