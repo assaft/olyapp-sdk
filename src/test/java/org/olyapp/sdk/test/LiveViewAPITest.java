@@ -1,5 +1,8 @@
 package org.olyapp.sdk.test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 import org.junit.Assert;
@@ -10,6 +13,7 @@ import org.olyapp.sdk.LiveViewAPI;
 import org.olyapp.sdk.Property;
 import org.olyapp.sdk.PropertyDesc;
 import org.olyapp.sdk.ProtocolError;
+import org.olyapp.sdk.utils.StringUtils;
 
 public class LiveViewAPITest {
 	CameraMainAPI cameraMainAPI;
@@ -18,7 +22,8 @@ public class LiveViewAPITest {
 	@Before
 	public void init() throws ProtocolError {
 		cameraMainAPI = new CameraMainAPI();  
-		liveViewAPI = cameraMainAPI.setLiveViewMode();
+		cameraMainAPI.setPlayMode();
+		liveViewAPI = cameraMainAPI.setLiveViewMode("0640x0480");
 	}
 	
 	@Test
@@ -58,5 +63,20 @@ public class LiveViewAPITest {
 		}
 	}
 
+	@Test
+	public void liveStreamTest() throws ProtocolError, InterruptedException {
+		System.out.println("Started");
+		liveViewAPI.startLiveView(22000, i->{
+			System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(i.getImageId()));
+			try {
+				Files.write(Paths.get(i.getImageId() + ".jpg"),i.getData());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		});
+		Thread.sleep(20000);
+		liveViewAPI.stopLiveView();
+		System.out.println("Stopped");
+	}
 	
 }

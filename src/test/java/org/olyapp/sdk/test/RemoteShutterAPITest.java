@@ -18,6 +18,10 @@ public class RemoteShutterAPITest {
 	}
 	
 	@Test
+	public void switchToRemoteShutter() {
+	}
+	
+	@Test
 	public void firstPushRelease() throws ProtocolError, InterruptedException {
 		remoteShutterAPI.firstPush();
 		Thread.sleep(2000);

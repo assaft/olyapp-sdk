@@ -38,7 +38,7 @@ public class CameraMainAPI {
 	}
 
 	public LiveViewAPI setLiveViewMode() throws ProtocolError {
-		return setLiveViewMode("0640x0320");
+		return setLiveViewMode("0640x0480");
 	}
 
 	public LiveViewAPI setLiveViewMode(String resolution) throws ProtocolError {

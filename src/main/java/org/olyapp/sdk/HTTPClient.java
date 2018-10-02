@@ -44,7 +44,8 @@ public class HTTPClient {
 		try (CloseableHttpClient httpclient = HttpClientBuilder.create().setDefaultRequestConfig(config).build();
 				CloseableHttpResponse response = httpclient.execute(httpRequest)) {
 			StatusLine statusLine = response.getStatusLine();
-	        if (statusLine.getStatusCode()!=200) {
+	        int statusCode = statusLine.getStatusCode();
+			if (statusCode!=200 && statusCode!=202) {
 	        	System.err.println("HTTP error: [" + statusLine + "] for request: [" + httpRequest + "]");
 	        	throw new ProtocolError("Request error: " + statusLine);
 	        }

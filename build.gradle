@@ -21,7 +21,9 @@ wrapper {
 }
 
 dependencies {
-	compile 'org.apache.httpcomponents:httpclient:4.5.6'
-	compile 'com.google.guava:guava:11.0.2'
-	testCompile "junit:junit:4.12"
+	compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
+	compile group: 'com.google.guava', name: 'guava', version: '26.0-android'
+	testCompile group: 'junit', name: 'junit', version: '4.12'
+	testCompile group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.25'
+
 }

@@ -102,6 +102,9 @@ public class LiveViewServer extends Thread {
 	
 					// obtain an image buffer object
 					ImageBuffer imageBuffer;
+					
+					
+					
 					if (!receivedImageData.containsKey(imageId)) {
 						imageBuffer = new ImageBuffer();
 						receivedImageData.put(imageId, imageBuffer);
