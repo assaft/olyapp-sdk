@@ -3,6 +3,8 @@ package org.olyapp.sdk;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.olyapp.sdk.utils.HTTPClient;
+
 public class CameraMainAPI {
 	public static final String DEF_CAMERA_IP = "192.168.0.10";
 
@@ -35,10 +37,6 @@ public class CameraMainAPI {
 	
 	public String getCommandList() throws ProtocolError {
 		return HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + GET_COMMAND_LIST);
-	}
-
-	public LiveViewAPI setLiveViewMode() throws ProtocolError {
-		return setLiveViewMode("0640x0480");
 	}
 
 	public LiveViewAPI setLiveViewMode(String resolution) throws ProtocolError {

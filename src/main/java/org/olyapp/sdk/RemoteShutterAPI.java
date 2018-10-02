@@ -1,5 +1,7 @@
 package org.olyapp.sdk;
 
+import org.olyapp.sdk.utils.HTTPClient;
+
 public class RemoteShutterAPI {
 
 	public static final String EXEC_SHUTTER = "exec_shutter.cgi";

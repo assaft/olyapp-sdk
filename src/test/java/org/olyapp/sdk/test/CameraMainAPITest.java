@@ -3,7 +3,6 @@ package org.olyapp.sdk.test;
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
-import org.olyapp.sdk.CameraMainAPI;
 import org.olyapp.sdk.ProtocolError;
 import org.olyapp.sdk.RemoteShutterAPI;
 
@@ -38,9 +37,15 @@ public class CameraMainAPITest {
 	}
 
 	@Test
-	public void testLiveViewMode() throws ProtocolError {
-		cameraAPI.setLiveViewMode();
+	public void testLiveViewMode320x240() throws ProtocolError {
+		cameraAPI.setLiveViewMode("0320x0240");
 	}
+
+	@Test
+	public void testLiveViewMode640x480() throws ProtocolError {
+		cameraAPI.setLiveViewMode("0640x0480");
+	}
+
 
 	@Test
 	public void testPlayMode() throws ProtocolError {

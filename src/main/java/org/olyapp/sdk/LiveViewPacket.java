@@ -1,15 +1,15 @@
-package org.olyapp.sdk.lvsrv;
+package org.olyapp.sdk;
 
 import lombok.Value;
 
 @Value
-public class Packet {
+public class LiveViewPacket {
 	
 	byte[] data;
 	int startingPoint;
 	int endingPoint;
 	
-	public Packet(byte[] data, int startingPoint, int endingPoint) {
+	public LiveViewPacket(byte[] data, int startingPoint, int endingPoint) {
 		super();
 		this.startingPoint = startingPoint;
 		this.endingPoint = endingPoint;

@@ -1,12 +1,10 @@
-package org.olyapp.sdk;
+package org.olyapp.sdk.utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -16,7 +14,11 @@ import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
+import org.olyapp.sdk.ProtocolError;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class HTTPClient {
 
 	public static final int CONNECT_TIMEOUT = 500; //ms
@@ -46,7 +48,7 @@ public class HTTPClient {
 			StatusLine statusLine = response.getStatusLine();
 	        int statusCode = statusLine.getStatusCode();
 			if (statusCode!=200 && statusCode!=202) {
-	        	System.err.println("HTTP error: [" + statusLine + "] for request: [" + httpRequest + "]");
+	        	log.error("HTTP error: [" + statusLine + "] for request: [" + httpRequest + "]");
 	        	throw new ProtocolError("Request error: " + statusLine);
 	        }
 	        return new BufferedReader(new InputStreamReader(response.getEntity().getContent())).lines()
@@ -56,19 +58,4 @@ public class HTTPClient {
 		} 
 	}
 	
-	public static abstract class HTTPContentAsStringHandler<T> implements Function<HttpResponse,T> {
-
-		@Override
-		public T apply(HttpResponse t) {
-			try {
-				return handle(new BufferedReader(new InputStreamReader(t.getEntity().getContent())).lines()
-						   .parallel().collect(Collectors.joining("")));
-			} catch (UnsupportedOperationException | IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-		
-		public abstract T handle(String httpContent);
-		
-	}
 }

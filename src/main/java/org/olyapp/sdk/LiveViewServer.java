@@ -17,9 +17,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
-import org.olyapp.sdk.lvsrv.ImageBuffer;
-import org.olyapp.sdk.utils.InvalidJpegFormat;
-import org.olyapp.sdk.utils.JpegUtils;
+import org.olyapp.sdk.utils.SimpleImageInfo;
 import org.olyapp.sdk.utils.StringUtils;
 
 import com.google.common.cache.CacheBuilder;
@@ -38,6 +36,7 @@ public class LiveViewServer {
 	private final ExecutorService handlerExecutor;
 	private final AtomicBoolean liveStreamOpen;
 	private final LoadingCache<Integer, ImageBuffer> packetCache;
+	private final LoadingCache<Integer, Boolean> errorCache;
 	private final LinkedBlockingDeque<ImageData> imageQueue;
 	private final byte[] buffer;
 
@@ -57,11 +56,20 @@ public class LiveViewServer {
 		this.liveStreamOpen = new AtomicBoolean(false);
 		this.packetCache = CacheBuilder.newBuilder()
 			    .maximumSize(1000)
-			    .expireAfterAccess(2, TimeUnit.MINUTES)
+			    .expireAfterAccess(2, TimeUnit.SECONDS)
 			    .build(
 			        new CacheLoader<Integer, ImageBuffer>() {
 			          public ImageBuffer load(Integer i) {
 			        	  return new ImageBuffer();
+			          }
+			        });
+		this.errorCache = CacheBuilder.newBuilder()
+			    .maximumSize(1000)
+			    .expireAfterAccess(2, TimeUnit.SECONDS)
+			    .build(
+			        new CacheLoader<Integer, Boolean>() {
+			          public Boolean load(Integer i) {
+			        	  return false;
 			          }
 			        });
 		this.imageQueue = new LinkedBlockingDeque<>(1000);
@@ -80,6 +88,8 @@ public class LiveViewServer {
 		}
 		
 		try {
+			log.info("start() - Passing task to worker thread");
+			
 			listenerExecutor.execute(()->{
 				log.debug("Live stream thread invoked");					
 	
@@ -114,15 +124,25 @@ public class LiveViewServer {
 										(data[offset+6] & 0xff) << 8) | 
 										(data[offset+7] & 0xff);
 		
-								ImageBuffer imageBuffer= packetCache.get(imageId);
-								if (imageBuffer.addPacket(type, packetId, imageId, data, length)) {
-									byte[] imageBytes = imageBuffer.getImage();
-									ImageMetadata imageMetadata = new ImageMetadata(imageBuffer,imageId);
-									log.debug("Image " + StringUtils.toHex(imageId) + " is ready");
-									handlerExecutor.execute(()->{
-										consumer.accept(new ImageData(imageId, imageMetadata, imageBytes));
-									});
-									packetCache.invalidate(imageId);
+								if (!errorCache.get(imageId)) {
+									ImageBuffer imageBuffer= packetCache.get(imageId);
+									try {
+										if (imageBuffer.addPacket(type, packetId, imageId, data, length)) {
+											byte[] imageBytes = imageBuffer.getImage();
+											ImageMetadata imageMetadata = new ImageMetadata(imageBuffer,imageId);
+											log.debug("Image " + StringUtils.toHex(imageId) + " is ready");
+											handlerExecutor.execute(()->{
+												consumer.accept(new ImageData(imageId, imageMetadata, imageBytes));
+											});
+											packetCache.invalidate(imageId);
+										}
+									} catch (Exception e) {
+										log.info("Image: " + StringUtils.toHex(imageId) + " has an error: [" + e.getMessage() + "]");
+										errorCache.put(imageId,true);
+										packetCache.invalidate(imageId);
+									}
+								} else {
+									log.debug("Ignoring packet " + StringUtils.toHex(packetId) + " of bad image: " + StringUtils.toHex(imageId));
 								}
 							}
 						} catch (SocketTimeoutException e) {
@@ -146,6 +166,7 @@ public class LiveViewServer {
 					throw new RuntimeException(e);
 				} finally {
 					packetCache.invalidateAll();
+					errorCache.invalidateAll();
 					imageQueue.clear();
 					liveStreamOpen.set(false);
 					log.debug("Clean-ups");
@@ -171,11 +192,6 @@ public class LiveViewServer {
 		    }
 		}
 		log.info("stop() - Finished");
-	}
-	
-	void clearImageBuffer() {
-		packetCache.invalidateAll();
-		imageQueue.clear();
 	}
 
 	@Value
@@ -214,7 +230,7 @@ public class LiveViewServer {
 		int focusField;
 		boolean autoFocus;
 		
-		public ImageMetadata(ImageBuffer imageBuffer, int imageId) throws InvalidJpegFormat {
+		public ImageMetadata(ImageBuffer imageBuffer, int imageId) throws IOException {
 			this.metadata = imageBuffer.getMetadata().clone();
 			
 			try {
@@ -240,10 +256,11 @@ public class LiveViewServer {
 			aspectRatioHeight			= interpret(metadata,0x9F,2);
 			expWarning 					= interpret(metadata,0xA6,2)==1;
 			focalLength					= interpret(metadata,0xB6,2);
-			Dimensions d = JpegUtils.getDimensions(imageBuffer.getImage());
-			width = d.getWidth(); 
-			height = d.getHeight();
-
+			
+			SimpleImageInfo	simpleImageInfo = new SimpleImageInfo(imageBuffer.getImage());
+			width = simpleImageInfo.getWidth();
+			height = simpleImageInfo.getHeight();
+			
 			log.debug("shutter speed: " + shutterSpeedNumerator + "/" + shutterSpeedDenominator);
 			log.debug("focalValue: " + focalValueNumerator + "/" + focalValueDenominator);
 			log.debug("expComp: " + expCompNumerator + "/" + expCompDenominator);

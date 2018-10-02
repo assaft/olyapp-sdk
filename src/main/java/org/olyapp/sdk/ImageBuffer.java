@@ -1,4 +1,4 @@
-package org.olyapp.sdk.lvsrv;
+package org.olyapp.sdk;
 
 import java.util.Map;
 import java.util.Set;
@@ -12,7 +12,7 @@ public class ImageBuffer {
 	private static int MAX_PACKET_ID = 0xFFFF;
 
 	byte[] metadata;
-	Map<Integer,Packet> packets = new TreeMap<Integer, Packet>();
+	Map<Integer,LiveViewPacket> packets = new TreeMap<Integer, LiveViewPacket>();
 	Set<Integer> missingIds;
 	private int firstPacketId, lastPacketId;
 
@@ -23,23 +23,23 @@ public class ImageBuffer {
 		metadata = null;
 	}
 
-	public boolean addPacket(int type, int id, int imageId, byte[] data, int length) throws InvalidPacket {
-		PacketType etype = PacketType.parseCode(type);
+	public boolean addPacket(int type, int id, int imageId, byte[] data, int length) throws ProtocolError {
+		LiveViewPacketType etype = LiveViewPacketType.parseCode(type);
 		int startingPoint = etype.getImageStartingPint(data,length);
 		int endingPoint = etype.getImageEndingPint(data,length);
 		
 		//System.out.println("IPacket type=" + etype.toString() + "; id=" + id + "; image: " + StringUtils.toHex(imageId) + "; start=" + startingPoint + "; end=" + endingPoint);
 		
-		if (etype==PacketType.START) {
+		if (etype==LiveViewPacketType.START) {
 			metadata = new byte[startingPoint-1];
 			System.arraycopy(data, 12, metadata, 0, startingPoint-1);
 		}
 		
-		packets.put(id,new Packet(data,startingPoint,endingPoint));
+		packets.put(id,new LiveViewPacket(data,startingPoint,endingPoint));
 		
-		if (etype==PacketType.START) {
+		if (etype==LiveViewPacketType.START) {
 			firstPacketId = id;
-		} else if (etype==PacketType.END) {
+		} else if (etype==LiveViewPacketType.END) {
 			lastPacketId = id;
 		}
 
@@ -75,13 +75,13 @@ public class ImageBuffer {
 
 	public byte[] getImage() {
 		int size = 0;
-		for (Packet p: packets.values()) {
+		for (LiveViewPacket p: packets.values()) {
 			int packetDataSize = p.getData().length; 
 			size+=packetDataSize;
 		}
 		byte[] newBuff = new byte[size];
 		int offset = 0;
-		for (Packet p: packets.values()) {
+		for (LiveViewPacket p: packets.values()) {
 			int length = p.getData().length;
 			System.arraycopy(p.getData(),0,newBuff,offset,length);
 			offset+=length;
