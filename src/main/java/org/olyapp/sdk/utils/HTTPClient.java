@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.stream.Collectors;
 
+import org.apache.http.HttpEntity;
 import org.apache.http.StatusLine;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -16,29 +17,51 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.olyapp.sdk.ProtocolError;
 
+import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class HTTPClient {
 
-	public static final int CONNECT_TIMEOUT = 500; //ms
-	public static final int CONNECTION_TIMEOUT = 500; //ms
-	public static final int SOCKET_TIMEOUT = 2000; //ms
+	private static final int CONNECT_TIMEOUT = 500; //ms
+	private static final int CONNECTION_TIMEOUT = 500; //ms
+	private static final int SOCKET_TIMEOUT = 5000; //ms
 	
-	public static final String DEF_XML_CHAR_SET = "ISO-8859-1";
+	private static final String DEF_XML_CHAR_SET = "ISO-8859-1";
+
+	private static final HTTPClient instance = new HTTPClient();
 	
-	public static String doGet(String s) throws ProtocolError {
-		HttpGet httpGet = new HttpGet(s);
-		return request(httpGet);
+	public static HTTPClient getInstance() {
+		return instance;
 	}
 	
-	public static String doPost(String s, String value) throws ProtocolError {
+	private HTTPClient() {
+	}
+	
+	private interface HttpEntityReader<T> {
+		T read(HttpEntity entity) throws IOException;
+	}
+
+	@Synchronized
+	public String doGet(String s) throws ProtocolError {
+		HttpGet httpGet = new HttpGet(s);
+		return request(httpGet,textualEntityReader);
+	}
+
+	@Synchronized
+	public byte[] doGetBinary(String s) throws ProtocolError {
+		HttpGet httpGet = new HttpGet(s);
+		return request(httpGet,binaryEntityReader);
+	}
+	
+	@Synchronized
+	public String doPost(String s, String value) throws ProtocolError {
 		HttpPost httpPost = new HttpPost(s);
 		httpPost.setEntity(new StringEntity(value,DEF_XML_CHAR_SET));
-		return request(httpPost);
+		return request(httpPost,textualEntityReader);
 	}
 	
-	private static String request(HttpUriRequest httpRequest) throws ProtocolError {
+	private <T> T request(HttpUriRequest httpRequest, HttpEntityReader<T> entityReader) throws ProtocolError {
 		RequestConfig config = RequestConfig.custom()
 				  .setConnectTimeout(CONNECT_TIMEOUT)
 				  .setConnectionRequestTimeout(CONNECTION_TIMEOUT)
@@ -51,11 +74,18 @@ public class HTTPClient {
 	        	log.error("HTTP error: [" + statusLine + "] for request: [" + httpRequest + "]");
 	        	throw new ProtocolError("Request error: " + statusLine);
 	        }
-	        return new BufferedReader(new InputStreamReader(response.getEntity().getContent())).lines()
-					   .parallel().collect(Collectors.joining(""));
+	        return entityReader.read(response.getEntity());
 		} catch (IOException e) {
 			throw new ProtocolError(e.getMessage());
 		} 
+		
 	}
 	
+	private static final HttpEntityReader<String> textualEntityReader = h->
+		new BufferedReader(new InputStreamReader(h.getContent())).lines()
+			   .parallel().collect(Collectors.joining(""));  
+
+	private static final HttpEntityReader<byte[]> binaryEntityReader = h-> 
+		h.getContent().readAllBytes();
+		
 }

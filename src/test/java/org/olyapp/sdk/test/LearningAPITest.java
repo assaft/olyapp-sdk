@@ -1,7 +1,6 @@
 package org.olyapp.sdk.test;
 
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -13,7 +12,6 @@ import org.olyapp.sdk.Property;
 import org.olyapp.sdk.ProtocolError;
 import org.olyapp.sdk.utils.StringUtils;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
 public class LearningAPITest {
@@ -29,40 +27,8 @@ public class LearningAPITest {
 		// set the parameter 
 		liveViewAPI.setProperty(property,value);
 		
-		// run 
-		List<byte[]> buffers = Lists.newArrayListWithCapacity(1);
-		buffers.add(new byte[2]);
-		liveViewAPI.startLiveView(20000, image -> {
-			byte[] metadata = image.getMetadata().getMetadata();
-			buffers.set(0,metadata.clone());
-		});
-		Thread.sleep(300);
-		liveViewAPI.stopLiveView();
-		
-		return buffers.get(0);
-	}
-	
-	@Test
-	public void t1() {
-		byte[] buffer = new byte[4];
-		buffer[0] = (byte)0x00;
-		buffer[1] = (byte)0x01;
-		buffer[2] = (byte)0x00;
-		buffer[3] = (byte)0xFA;
-
-		//int v = (buffer[0]<<24) | (buffer[1]<<16) | (buffer[2]<<8) | (buffer[3]);
-		//System.out.println(v);
-		
-		int a = buffer[0]<<8 | buffer[1];
-		int b = buffer[2]<<8 | (buffer[3] & 0xFF);
-		System.out.println(a + " ; " + b);
-		
-		ByteBuffer buf = ByteBuffer.allocate(2);
-		buf.put(buffer, 2, 2);
-		buf.rewind();
-		System.out.println(buf.getShort());
-
-
+		// get an image and return its metadata buffer
+		return liveViewAPI.runLiveViewForSingleImage(20000, 1000).getMetadata().getBuffer();
 	}
 	
 	@Test 

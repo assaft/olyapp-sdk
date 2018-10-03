@@ -1,9 +1,10 @@
 package org.olyapp.sdk;
 
-public interface LiveViewShot {
-	String getTakeStatus();
-	FocusResult getFocusResult();
+import lombok.Value;
+
+@Value
+public class LiveViewShot {
+	String takeStatus;
+	FocusResult focusResult;
 	
-	Image requestSmallSizeJpeg() throws ProtocolError;
-	Image requestFullSizeJpeg() throws ProtocolError;
 }

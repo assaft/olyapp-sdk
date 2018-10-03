@@ -4,12 +4,16 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
+import org.olyapp.sdk.FocusResult;
 import org.olyapp.sdk.LiveViewAPI;
+import org.olyapp.sdk.LiveViewHandler;
+import org.olyapp.sdk.LiveViewImageData;
 import org.olyapp.sdk.Property;
 import org.olyapp.sdk.PropertyDesc;
 import org.olyapp.sdk.ProtocolError;
@@ -64,19 +68,114 @@ public class LiveViewAPITest {
 	}
 
 	@Test
-	public void liveStreamTest() throws ProtocolError, InterruptedException {
-		System.out.println("Started");
-		liveViewAPI.startLiveView(22000, i->{
-			System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(i.getImageId()));
+	public void startStopLiveStreamTest() throws ProtocolError, InterruptedException {
+		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+			
+			@Override
+			public void onTimeout(long ms) {
+				System.out.println("timeout");
+			}
+			
+			@Override
+			public void onImage(LiveViewImageData imageData) {
+				try {
+					Files.write(Paths.get(imageData.getImageId() + ".jpg"),imageData.getData());
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+			
+		},1000);
+		Thread.sleep(20000);
+		liveViewAPI.stopLiveView();
+	}
+
+	@Test
+	public void runLiveStreamTest1() throws ProtocolError, InterruptedException {
+		long startTime = System.currentTimeMillis();
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, -1, 5000); 
+		long endTime = System.currentTimeMillis();
+		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
+		images.forEach(imageData->{
 			try {
-				Files.write(Paths.get(i.getImageId() + ".jpg"),i.getData());
+				Files.write(Paths.get(imageData.getImageId() + ".jpg"),imageData.getData());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		});
-		Thread.sleep(20000);
-		liveViewAPI.stopLiveView();
-		System.out.println("Stopped");
+	}
+
+	@Test
+	public void runLiveStreamTest2() throws ProtocolError, InterruptedException {
+		long startTime = System.currentTimeMillis();
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, 80, -1);
+		long endTime = System.currentTimeMillis();
+		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
+		images.forEach(imageData->{
+			try {
+				Files.write(Paths.get(imageData.getImageId() + ".jpg"),imageData.getData());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		});
 	}
 	
+	@Test
+	public void runLiveStreamTest3() throws ProtocolError, InterruptedException {
+		long startTime = System.currentTimeMillis();
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, 1, -1); 
+		long endTime = System.currentTimeMillis();
+		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
+		images.forEach(imageData->{
+			try {
+				Files.write(Paths.get(imageData.getImageId() + ".jpg"),imageData.getData());
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		});
+	}
+	
+
+	@Test
+	public void focusTest() throws ProtocolError, InterruptedException {
+		AtomicReference<FocusResult> focusResult = new AtomicReference<>();
+		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+			@Override
+			public void onTimeout(long ms) {
+				System.out.println("timeout");
+			}
+			
+			@Override
+			public void onImage(LiveViewImageData imageData) {
+				System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(imageData.getImageId()));
+			}
+			
+		}, 1000);
+		Thread.sleep(1000);
+		focusResult.set(liveViewAPI.acquireFocus(327, 213));
+		liveViewAPI.releaseFocus();
+		liveViewAPI.stopLiveView();
+		System.out.println(focusResult.get());
+	}
+
+	
+	@Test
+	public void takePicture() throws ProtocolError, InterruptedException, IOException {
+		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+			@Override
+			public void onTimeout(long ms) {
+			}
+			
+			@Override
+			public void onImage(LiveViewImageData imageData) {
+				System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(imageData.getImageId()));
+			}
+		},1000);
+		Thread.sleep(1000);
+		liveViewAPI.takePicture();
+		Files.write(Paths.get("test_small.jpg"), liveViewAPI.requestSmallSizeJpeg());
+		Files.write(Paths.get("test_big.jpg"), liveViewAPI.requestFullSizeJpeg());
+		liveViewAPI.stopLiveView();
+	}
+
 }

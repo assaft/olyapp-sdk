@@ -7,7 +7,7 @@ import java.util.TreeSet;
 
 import org.olyapp.sdk.utils.StringUtils;
 
-public class ImageBuffer {
+public class LiveViewImageBuffer {
 
 	private static int MAX_PACKET_ID = 0xFFFF;
 
@@ -16,7 +16,7 @@ public class ImageBuffer {
 	Set<Integer> missingIds;
 	private int firstPacketId, lastPacketId;
 
-	public ImageBuffer() {
+	public LiveViewImageBuffer() {
 		firstPacketId = -1;
 		lastPacketId = -1;
 		missingIds = null;

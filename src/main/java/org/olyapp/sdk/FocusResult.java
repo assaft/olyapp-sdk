@@ -1,15 +1,21 @@
 package org.olyapp.sdk;
 
-public interface FocusResult {
+import java.util.Optional;
 
-	public interface FocusError extends FocusResult {
-		String getMessage();
+import lombok.Value;
+
+@Value
+public class FocusResult {
+
+	public enum FocusStatus {
+		OK, 		// Auto focus succeeded
+		FAILED, 	// Auto focus failed
+		DISABLED,	// Auto focus disabled (e.g. when in manual focus mode)
 	}
 	
-	public interface FocusOK extends FocusResult {
-		int getFocusX();
-		int getFocusY();
-		int getFocusWidth();
-		int getFocusHeight();
-	}
+	FocusStatus focusStatus;
+	Optional<Integer> focusFrameTopLeftX;
+	Optional<Integer> focusFrameTopLeftY;
+	Optional<Integer> focusFrameWidth;
+	Optional<Integer> focusFrameHeight;
 }

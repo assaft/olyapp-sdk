@@ -1,12 +1,8 @@
 package org.olyapp.sdk;
 
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketTimeoutException;
-import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -15,16 +11,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Consumer;
 
-import org.olyapp.sdk.utils.SimpleImageInfo;
 import org.olyapp.sdk.utils.StringUtils;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
-import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -35,11 +28,10 @@ public class LiveViewServer {
 	private final ExecutorService listenerExecutor;
 	private final ExecutorService handlerExecutor;
 	private final AtomicBoolean liveStreamOpen;
-	private final LoadingCache<Integer, ImageBuffer> packetCache;
+	private final LoadingCache<Integer, LiveViewImageBuffer> packetCache;
 	private final LoadingCache<Integer, Boolean> errorCache;
-	private final LinkedBlockingDeque<ImageData> imageQueue;
+	private final LinkedBlockingDeque<LiveViewImageData> imageQueue;
 	private final byte[] buffer;
-
 	
 	private final Lock lock;
 	private final Condition liveStreamStopped; 
@@ -58,9 +50,9 @@ public class LiveViewServer {
 			    .maximumSize(1000)
 			    .expireAfterAccess(2, TimeUnit.SECONDS)
 			    .build(
-			        new CacheLoader<Integer, ImageBuffer>() {
-			          public ImageBuffer load(Integer i) {
-			        	  return new ImageBuffer();
+			        new CacheLoader<Integer, LiveViewImageBuffer>() {
+			          public LiveViewImageBuffer load(Integer i) {
+			        	  return new LiveViewImageBuffer();
 			          }
 			        });
 		this.errorCache = CacheBuilder.newBuilder()
@@ -78,7 +70,7 @@ public class LiveViewServer {
 		this.buffer = new byte[1536];
 	}
 	
-	public void start(int port, Consumer<ImageData> consumer) throws InterruptedException, ProtocolError {
+	public void start(int port, LiveViewHandler handler, long timeout) throws InterruptedException, ProtocolError {
 		log.info("start() - Started");
 		
 		// sanity
@@ -86,23 +78,29 @@ public class LiveViewServer {
 			log.error("Live stream is already open");
 			return;
 		}
-		
+
 		try {
 			log.info("start() - Passing task to worker thread");
-			
+
 			listenerExecutor.execute(()->{
 				log.debug("Live stream thread invoked");					
 	
 				int currentSessionId = -1;
 				liveStreamOpen.set(true);
-	
+
+				boolean timeoutExpired = false;
+				long lastPacketTime = System.currentTimeMillis();
+				long timeSinceLastPacket = 0;
+				
 				try (DatagramSocket serverSocket = new DatagramSocket(port)) {
 					serverSocket.setSoTimeout(SOCKET_TIMEOUT_MS);
-					log.debug("UDP socket is ready - entering mainloop");					
-					while(liveStreamOpen.get()) {
+					log.debug("UDP socket is ready - entering mainloop");
+					while(liveStreamOpen.get() && !timeoutExpired) {
 						try {
 							DatagramPacket receivePacket = new DatagramPacket(buffer, buffer.length);
 							serverSocket.receive(receivePacket);
+							lastPacketTime = System.currentTimeMillis();
+							
 							byte[] data = receivePacket.getData();
 							int offset = receivePacket.getOffset();
 							int length = receivePacket.getLength();
@@ -125,14 +123,14 @@ public class LiveViewServer {
 										(data[offset+7] & 0xff);
 		
 								if (!errorCache.get(imageId)) {
-									ImageBuffer imageBuffer= packetCache.get(imageId);
+									LiveViewImageBuffer imageBuffer= packetCache.get(imageId);
 									try {
 										if (imageBuffer.addPacket(type, packetId, imageId, data, length)) {
 											byte[] imageBytes = imageBuffer.getImage();
-											ImageMetadata imageMetadata = new ImageMetadata(imageBuffer,imageId);
+											LiveViewImageMetadata imageMetadata = new LiveViewImageMetadata(imageBuffer,imageId);
 											log.debug("Image " + StringUtils.toHex(imageId) + " is ready");
 											handlerExecutor.execute(()->{
-												consumer.accept(new ImageData(imageId, imageMetadata, imageBytes));
+												handler.onImage(new LiveViewImageData(imageId, imageMetadata, imageBytes));
 											});
 											packetCache.invalidate(imageId);
 										}
@@ -151,16 +149,23 @@ public class LiveViewServer {
 							// and we don't want the caller to wait too
 							// long in case no packet has arrived.
 							log.debug("No data in socket (camera is out-of-range or stopped sending)");
+							timeSinceLastPacket = System.currentTimeMillis()-lastPacketTime;
+							timeoutExpired = timeSinceLastPacket > timeout;
 						}
 					}
-					log.debug("Out of mainloop based on request");					
-					lock.lock();
-					try {
-						log.debug("Signaling live stream stop");
-						liveStreamStopped.signal();
-					} finally {
-						lock.unlock();
-				    }
+					
+					if (timeoutExpired) {
+						log.debug("Out of mainloop because timeout expired");
+					} else {
+						log.debug("Out of mainloop based on request");					
+						lock.lock();
+						try {
+							log.debug("Signaling live stream stop");
+							liveStreamStopped.signal();
+						} finally {
+							lock.unlock();
+					    }
+					}
 				} catch (Exception e) {
 					log.error("Exception: " + e.getMessage());
 					throw new RuntimeException(e);
@@ -169,13 +174,16 @@ public class LiveViewServer {
 					errorCache.invalidateAll();
 					imageQueue.clear();
 					liveStreamOpen.set(false);
-					log.debug("Clean-ups");
+					if (timeoutExpired) {
+						handler.onTimeout(timeSinceLastPacket);
+					}
 				}
 			});
 		} catch (Exception e) {
 			throw new ProtocolError(e.getMessage());
+		} finally {
+			log.info("start() - Finished");
 		}
-		log.info("start() - Finished");
 	}
 	
 	public void stop() throws InterruptedException {
@@ -184,7 +192,7 @@ public class LiveViewServer {
 			liveStreamOpen.set(false);
 			lock.lock();
 			try {
-				log.debug("Waiting for live stream signal");
+				log.debug("Waiting for live stream ending signal");
 				liveStreamStopped.await(2,TimeUnit.SECONDS);
 				log.debug("Signal received");
 			} finally {
@@ -194,108 +202,8 @@ public class LiveViewServer {
 		log.info("stop() - Finished");
 	}
 
-	@Value
-	public class ImageMetadata {
-		
-		byte[] metadata;
-		
-		int width;
-		int height;
-		
-		int shutterSpeedNumerator;
-		int shutterSpeedDenominator;
-		
-		int focalValueNumerator;
-		int focalValueDenominator;
-		
-		int expCompNumerator;
-		int expCompDenominator;
-
-		boolean expWarning;
-		
-		int whiteBalance;
-		boolean autoWhiteBalance;
-		
-		int isoSpeed;
-		boolean autoIsoSpeed;
-		boolean isoSpeedWarning;
-		
-		int aspectRatioWidth;
-		int aspectRatioHeight;
-		
-		int focalLength;
-
-		int orientation;
-		
-		int focusField;
-		boolean autoFocus;
-		
-		public ImageMetadata(ImageBuffer imageBuffer, int imageId) throws IOException {
-			this.metadata = imageBuffer.getMetadata().clone();
-			
-			try {
-				Files.write(Paths.get(imageId + ".bin"), metadata);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			
-			orientation					= interpret(metadata,0x12,2);
-			shutterSpeedNumerator  		= interpret(metadata,0x58,2); 
-			shutterSpeedDenominator  	= interpret(metadata,0x5A,2);
-			focalValueNumerator  		= interpret(metadata,0x6A,2);
-			focalValueDenominator  		= interpret(metadata,0x6C,2); 
-			expCompNumerator			= interpret(metadata,0x78,4);
-			expCompDenominator			= 10;
-			isoSpeed					= interpret(metadata,0x82,2);
-			autoIsoSpeed				= interpret(metadata,0x84,2)==1;
-			isoSpeedWarning				= interpret(metadata,0x8A,2)==1;
-			whiteBalance				= interpret(metadata,0x92,2);
-			autoWhiteBalance			= interpret(metadata,0x94,2)==1;
-			aspectRatioWidth			= interpret(metadata,0x9D,2);
-			aspectRatioHeight			= interpret(metadata,0x9F,2);
-			expWarning 					= interpret(metadata,0xA6,2)==1;
-			focalLength					= interpret(metadata,0xB6,2);
-			
-			SimpleImageInfo	simpleImageInfo = new SimpleImageInfo(imageBuffer.getImage());
-			width = simpleImageInfo.getWidth();
-			height = simpleImageInfo.getHeight();
-			
-			log.debug("shutter speed: " + shutterSpeedNumerator + "/" + shutterSpeedDenominator);
-			log.debug("focalValue: " + focalValueNumerator + "/" + focalValueDenominator);
-			log.debug("expComp: " + expCompNumerator + "/" + expCompDenominator);
-			log.debug("iso-speed: " + isoSpeed + " (auto? " + autoIsoSpeed + ") + (warning? " + isoSpeedWarning + ")");
-			log.debug("white-balance: " + whiteBalance + " (auto? " + autoWhiteBalance + ")");
-			log.debug("aspect-ratio: " + aspectRatioWidth + "x" + aspectRatioHeight);
-			log.debug("focalLength: " + focalLength + "mm");
-			log.debug("exposure warning: " + expWarning);
-			log.debug("orientation: " + orientation);
-			log.debug("dimensions: " + width + "x" + height);
-
-			focusField = 30;
-			autoFocus = true;
-		}
-		
-		private int interpret(byte[] buffer, int offset, int count) {
-			int result;
-			if (count==1) {
-				result = buffer[offset] & 0xFF;
-			} else {
-				ByteBuffer byteBuffer = ByteBuffer.allocate(count);
-				byteBuffer.put(buffer, offset, count);
-				byteBuffer.rewind();
-				result = count==2 ? byteBuffer.getShort() : byteBuffer.getInt();
-			}
-			return result;
-		}
+	public boolean isLiveStreamOpen() {
+		return liveStreamOpen.get();
 	}
-	
-	@Value
-	public class ImageData {
-		int imageId;
-		ImageMetadata metadata;
-		byte[]	data;
-	}
-	
 	
 }

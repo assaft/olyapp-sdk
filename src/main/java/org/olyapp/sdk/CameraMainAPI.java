@@ -18,7 +18,7 @@ public class CameraMainAPI {
 	public static final Pattern connectionModelPattern = Pattern.compile("<.?xml.*><connectmode>(.*)</connectmode>");
 	
 	public String getCameraModel() throws ProtocolError {
-		String response = HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + GET_CAMERA_INFO);
+		String response = HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + GET_CAMERA_INFO);
 		Matcher matcher = cameraModelPattern.matcher(response);
 		if (!matcher.matches()) {
 			throw new ProtocolError("Failed to retrieve camera model");
@@ -27,7 +27,7 @@ public class CameraMainAPI {
 	}
 
 	public String getConnectMode() throws ProtocolError {
-		String response = HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + GET_CONNECT_MODE);
+		String response = HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + GET_CONNECT_MODE);
 		Matcher matcher = connectionModelPattern.matcher(response);
 		if (!matcher.matches()) {
 			throw new ProtocolError("Failed to retrieve connection mode");
@@ -36,27 +36,27 @@ public class CameraMainAPI {
 	}
 	
 	public String getCommandList() throws ProtocolError {
-		return HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + GET_COMMAND_LIST);
+		return HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + GET_COMMAND_LIST);
 	}
 
 	public LiveViewAPI setLiveViewMode(String resolution) throws ProtocolError {
-		HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=rec&lvqty=" + resolution);
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=rec&lvqty=" + resolution);
 		return new LiveViewAPI();
 	}
 
 	
 	public RemoteShutterAPI setRemoteShutterMode() throws ProtocolError {
-		HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=shutter");
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=shutter");
 		return new RemoteShutterAPI();
 	}
 
 	public Play setPlayMode() throws ProtocolError {
-		HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=play");
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=play");
 		return null;
 	}
 	
 	public void shutdown() throws ProtocolError {
-		HTTPClient.doGet("http://" + DEF_CAMERA_IP + "/" + EXEC_POWEROFF);
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + EXEC_POWEROFF);
 	}
 
 }
