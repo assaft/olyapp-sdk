@@ -21,6 +21,11 @@ test {
     exclude 'org/olyapp/sdk/test/**'
 }
 
+buildScan {
+  licenseAgreementUrl = "https://gradle.com/terms-of-service"
+  licenseAgree = "yes"
+}
+
 dependencies {
 	compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.6'
 	compile group: 'com.google.guava', name: 'guava', version: '26.0-android'
