@@ -1,8 +1,15 @@
 package org.olyapp.sdk.test;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.List;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
+import org.olyapp.sdk.Dimensions;
+import org.olyapp.sdk.LiveViewAPI;
+import org.olyapp.sdk.LiveViewImageData;
 import org.olyapp.sdk.ProtocolError;
 import org.olyapp.sdk.RemoteShutterAPI;
 
@@ -37,18 +44,25 @@ public class CameraMainAPITest {
 	}
 
 	@Test
-	public void testLiveViewMode320x240() throws ProtocolError {
-		cameraAPI.setLiveViewMode(20000,1000,"0320x0240");
-	}
-
-	@Test
-	public void testLiveViewMode640x480() throws ProtocolError {
-		cameraAPI.setLiveViewMode(20000,1000,"0640x0480");
+	public void testLiveViewMode() throws ProtocolError {
+		List<Dimensions> resolutions = cameraAPI.getLiveViewResolutions();
+		cameraAPI.setLiveViewMode(20000,1000,resolutions.get(resolutions.size()-1));
 	}
 	
 	@Test 
-	public void testLiveViewResolutions() throws ProtocolError {
-		System.out.println(cameraAPI.getLiveViewResolutions());
+	public void testLiveViewModeAllResolutions() throws ProtocolError, InterruptedException {
+		List<Dimensions> resolutions = cameraAPI.getLiveViewResolutions();
+		for (Dimensions resolution : resolutions) {
+			testLiveViewModeResolution(resolution);
+		}
+	}
+	
+	public void testLiveViewModeResolution(Dimensions resolution) throws ProtocolError, InterruptedException {
+		LiveViewAPI liveViewAPI = cameraAPI.setLiveViewMode(20000,1000,resolution);
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(1, -1);
+		LiveViewImageData image = images.get(0);
+		Dimensions imageResolution = image.getMetadata().getDimensions();
+		assertEquals(resolution, imageResolution);
 	}
 
 	@Test

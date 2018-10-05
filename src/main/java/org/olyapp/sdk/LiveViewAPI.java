@@ -49,7 +49,7 @@ public class LiveViewAPI {
 		String response = HTTPClient.getInstance().doGet("http://" + CameraMainAPI.DEF_CAMERA_IP + "/" + GET_CAM_PROP + "?prop=desc&propname=" + property.getName());
 		Matcher matcher = propertyDescPattern.matcher(response);
 		if (!matcher.matches()) {
-			throw new ProtocolError("Failed to retrieve camera property description for [" + property + "]");
+			throw new ProtocolError("Failed to retrieve camera property description for [" + property + "] - response: [" + response + "]");
 		}
 		String type = matcher.group(2);
 		String value = matcher.group(3);
@@ -153,15 +153,15 @@ public class LiveViewAPI {
 	}
 
 	@Synchronized
-	public FocusResult acquireFocus(int x, int y) throws ProtocolError {
+	public FocusResult acquireFocus(Coordinate coordinate) throws ProtocolError {
 		if (!LiveViewServer.getInstance().isLiveStreamOpen()) {
 			throw new ProtocolError("Live-view must be open to acquire focus");			
 		}
 		
 		String response = HTTPClient.getInstance().doGet("http://" + CameraMainAPI.DEF_CAMERA_IP + "/" + TAKE_MOTION + 
 				"?com=assignafframe&point="+
-				String.format("%04d", x) + "x" +
-				String.format("%04d", y));
+				String.format("%04d", coordinate.getX()) + "x" +
+				String.format("%04d", coordinate.getY()));
 		try {
 			Matcher matcher = focusPattern.matcher(response);
 			if (!matcher.matches()) {

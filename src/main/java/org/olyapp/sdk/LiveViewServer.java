@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LiveViewServer {
 
-	private final static int SOCKET_TIMEOUT_MS = 200;
+	private final static int SOCKET_TIMEOUT_MS = 500;
 
 	private final ExecutorService listenerExecutor;
 	private final ExecutorService handlerExecutor;

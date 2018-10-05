@@ -29,6 +29,16 @@ public class RemoteShutterAPITest {
 	}
 
 	@Test 
+	public void firstSecondPush() throws ProtocolError, InterruptedException {
+		remoteShutterAPI.firstSecondPush();
+	}
+
+	@Test 
+	public void secondFirstRelease() throws ProtocolError, InterruptedException {
+		remoteShutterAPI.secondFirstRelease();
+	}
+	
+	@Test 
 	public void allSteps() throws ProtocolError {
 		remoteShutterAPI.firstPush();
 		remoteShutterAPI.secondPush();
@@ -47,7 +57,13 @@ public class RemoteShutterAPITest {
 	}
 
 	@Test
-	public void multiShot() throws ProtocolError, InterruptedException {
-		remoteShutterAPI.multiShot(3,1000);
+	public void multiShotAEFLocked() throws ProtocolError, InterruptedException {
+		remoteShutterAPI.multiShot(3,500);
 	}
+	
+	@Test
+	public void multiShot() throws ProtocolError, InterruptedException {
+		remoteShutterAPI.multiShot(3,500);
+	}
+	
 }

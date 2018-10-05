@@ -9,6 +9,8 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
+import org.olyapp.sdk.Coordinate;
+import org.olyapp.sdk.Dimensions;
 import org.olyapp.sdk.FocusResult;
 import org.olyapp.sdk.ImageResult;
 import org.olyapp.sdk.LiveViewAPI;
@@ -29,25 +31,30 @@ public class LiveViewAPITest {
 	public void init() throws ProtocolError {
 		cameraMainAPI = new CameraMainAPI();  
 		cameraMainAPI.setPlayMode();
-		liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,"0640x0480");
+		liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,new Dimensions(640,480));
+		liveViewAPI.setProperty(Property.DRIVE_MODE, "lowvib-normal");
 	}
 	
 	@Test
-	public void getAllDesc() throws ProtocolError, InterruptedException {
+	public void getAllDescsTest() throws ProtocolError, InterruptedException {
 		for (Property property : Property.values()) {
-			System.out.println(liveViewAPI.getPropertyDesc(property));
+			if (!property.isSuperProperty()) {
+				System.out.println(liveViewAPI.getPropertyDesc(property));
+			}
 		}
 	}
 
 	@Test
-	public void getAllValues() throws ProtocolError, InterruptedException {
+	public void getAllValuesTest() throws ProtocolError, InterruptedException {
 		for (Property property : Property.values()) {
-			System.out.println(liveViewAPI.getPropertyValue(property));
+			if (!property.isSuperProperty()) {
+				System.out.println(liveViewAPI.getPropertyValue(property));
+			}
 		}
 	}
 
 	@Test
-	public void getSetRevertValues() throws ProtocolError, InterruptedException {
+	public void getSetRevertValuesTest() throws ProtocolError, InterruptedException {
 		for (Property property : Property.values()) {
 			PropertyDesc desc = liveViewAPI.getPropertyDesc(property);
 			if (desc.getType().contains("set")) {
@@ -88,7 +95,7 @@ public class LiveViewAPITest {
 			}
 			
 		});
-		Thread.sleep(20000);
+		Thread.sleep(5000);
 		liveViewAPI.stopLiveView();
 	}
 
@@ -152,14 +159,14 @@ public class LiveViewAPITest {
 			
 		});
 		Thread.sleep(1000);
-		FocusResult focusResult = liveViewAPI.acquireFocus(40, 40);
+		FocusResult focusResult = liveViewAPI.acquireFocus(new Coordinate(40, 40));
 		liveViewAPI.releaseFocus();
 		liveViewAPI.stopLiveView();
 		System.out.println(focusResult);
 	}
-	
+
 	@Test
-	public void takePicture() throws ProtocolError, InterruptedException, IOException {
+	public void takePictureTest() throws ProtocolError, InterruptedException, IOException {
 		liveViewAPI.startLiveView(new LiveViewHandler() {
 			@Override
 			public void onTimeout(long ms) {
@@ -183,7 +190,7 @@ public class LiveViewAPITest {
 	}
 	
 	@Test
-	public void takeSmallSizeJpeg() throws ProtocolError, InterruptedException, IOException {
+	public void takeSmallSizeJpegTest() throws ProtocolError, InterruptedException, IOException {
 		ImageResult imageResult = liveViewAPI.takeSmallSizeJpeg();
 		if (imageResult.getTakeResult().getTakeStatus()==TakeStatus.OK) {
 			Files.write(Paths.get("test_take_small.jpg"), imageResult.getImage());
@@ -194,7 +201,7 @@ public class LiveViewAPITest {
 	}
 	
 	@Test
-	public void takeFullSizeJpeg() throws ProtocolError, InterruptedException, IOException {
+	public void takeFullSizeJpegTest() throws ProtocolError, InterruptedException, IOException {
 		ImageResult imageResult = liveViewAPI.takeFullSizeJpeg();
 		if (imageResult.getTakeResult().getTakeStatus()==TakeStatus.OK) {
 			Files.write(Paths.get("test_take_big.jpg"), imageResult.getImage());
@@ -203,5 +210,5 @@ public class LiveViewAPITest {
 			System.err.println("Failed to take picture: " + imageResult.getTakeResult());
 		}
 	}
-	
+
 }

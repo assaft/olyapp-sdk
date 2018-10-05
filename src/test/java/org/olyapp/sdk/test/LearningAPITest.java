@@ -6,6 +6,7 @@ import java.util.Map.Entry;
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
+import org.olyapp.sdk.Dimensions;
 import org.olyapp.sdk.LiveViewAPI;
 import org.olyapp.sdk.Property;
 import org.olyapp.sdk.ProtocolError;
@@ -32,7 +33,7 @@ public class LearningAPITest {
 	
 	@Test 
 	public void findExpComp() throws ProtocolError, InterruptedException {
-		LiveViewAPI liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,"0x640x0480");
+		LiveViewAPI liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,new Dimensions(640,480));
 
 		Map<String,byte[]> metadata = Maps.newLinkedHashMap();
 		

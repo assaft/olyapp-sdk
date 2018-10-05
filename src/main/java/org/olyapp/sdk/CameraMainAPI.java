@@ -21,8 +21,9 @@ public class CameraMainAPI {
 	
 	public static final Pattern cameraModelPattern = Pattern.compile("<.?xml.*><caminfo><model>(.*)</model></caminfo>");
 	public static final Pattern connectionModelPattern = Pattern.compile("<.?xml.*><connectmode>(.*)</connectmode>");
-	public static final Pattern resolutionsMainPattern = Pattern.compile("<param\\d name=\"rec\"><cmd\\d name=\"lvqty\">(<param\\d name=\"\\d+x\\d+\"/>)+</cmd\\d></param\\d>");
+	public static final Pattern resolutionsMainPattern = Pattern.compile("<param\\d name=\"rec\"><cmd\\d name=\"lvqty\">((?:<param\\d name=\"\\d+x\\d+\"/>)+)</cmd\\d></param\\d>");
 	public static final Pattern resolutionsSubPattern = Pattern.compile("<param\\d name=\"(\\d+x\\d+)\"/>");
+	public static final Pattern whiteSpacePattern = Pattern.compile(">\\s+<");
 	
 	@Synchronized
 	public String getCameraModel() throws ProtocolError {
@@ -53,23 +54,32 @@ public class CameraMainAPI {
 	public List<Dimensions> getLiveViewResolutions() throws ProtocolError {
 		List<Dimensions> result = Lists.newArrayList();
 		String response = HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + GET_COMMAND_LIST);
+		response = whiteSpacePattern.matcher(response).replaceAll("><");
 		Matcher matcher = resolutionsMainPattern.matcher(response);
-		if (matcher.matches()) {
-			matcher = resolutionsSubPattern.matcher(matcher.group(1));
+		if (matcher.find()) {
+			String resolutionsTags = matcher.group(1);
+			matcher = resolutionsSubPattern.matcher(resolutionsTags);
 			while (matcher.find()) {
+				String[] parts = matcher.group(1).split("x");
 				result.add(new Dimensions(
-						Integer.parseInt(matcher.group(1)), 
-						Integer.parseInt(matcher.group(2))));
+						Integer.parseInt(parts[0]), 
+						Integer.parseInt(parts[1])));
 			}
 		} else {
 			throw new ProtocolError("Failed to extract live view resolutions; response: [" + response + "]");
 		}
 		return result;
 	}
-	
+
 	@Synchronized
-	public LiveViewAPI setLiveViewMode(int port, long timeout, String resolution) throws ProtocolError {
-		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=rec&lvqty=" + resolution);
+	public LiveViewAPI setLiveViewMode(int port, long timeout, Dimensions resolution) throws ProtocolError {
+		// due to a bug in the E-M10 m1 camera firmware, it is 
+		// necessary to set PLAY mode before setting Live View 
+		// mode, otherwise the resolution parameter is ignored.
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=play");
+		HTTPClient.getInstance().doGet("http://" + DEF_CAMERA_IP + "/" + SWITCH_MODE + "?mode=rec&lvqty=" + 
+				String.format("%04d", resolution.getWidth()) + "x" +
+				String.format("%04d", resolution.getHeight()));
 		return new LiveViewAPI(port,timeout);
 	}
 

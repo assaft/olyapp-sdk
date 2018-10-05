@@ -45,12 +45,12 @@ public class RemoteShutterAPI {
 	}
 	
 	@Synchronized
-	public void multiShot(int n) throws ProtocolError, InterruptedException {
+	public void multiShotAEFLocked(int n) throws ProtocolError, InterruptedException {
 		multiShot(n,1000);
 	}
 
 	@Synchronized
-	public void multiShot(int n, int delay) throws ProtocolError, InterruptedException {
+	public void multiShotAEFLocked(int n, int delay) throws ProtocolError, InterruptedException {
 		firstPush();
 		for (int i=0 ; i<n ; i++) {
 			secondPush();
@@ -59,5 +59,13 @@ public class RemoteShutterAPI {
 		}
 		firstRelease();
 	}
-	
+
+	@Synchronized
+	public void multiShot(int n, int delay) throws ProtocolError, InterruptedException {
+		for (int i=0 ; i<n ; i++) {
+			singleShot();
+			Thread.sleep(delay);
+		}
+	}
+
 }

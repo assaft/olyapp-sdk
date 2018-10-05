@@ -10,4 +10,5 @@ public class Dimensions {
 	public String toString() {
 		return width + "x" + height;
 	}
+	
 }
