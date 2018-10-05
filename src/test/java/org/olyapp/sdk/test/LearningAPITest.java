@@ -1,6 +1,5 @@
 package org.olyapp.sdk.test;
 
-import java.nio.ByteBuffer;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -28,12 +27,12 @@ public class LearningAPITest {
 		liveViewAPI.setProperty(property,value);
 		
 		// get an image and return its metadata buffer
-		return liveViewAPI.runLiveViewForSingleImage(20000, 1000).getMetadata().getBuffer();
+		return liveViewAPI.runLiveViewForSingleImage().getMetadata().getBuffer();
 	}
 	
 	@Test 
 	public void findExpComp() throws ProtocolError, InterruptedException {
-		LiveViewAPI liveViewAPI = cameraMainAPI.setLiveViewMode("0x640x0480");
+		LiveViewAPI liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,"0x640x0480");
 
 		Map<String,byte[]> metadata = Maps.newLinkedHashMap();
 		

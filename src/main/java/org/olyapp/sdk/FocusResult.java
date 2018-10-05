@@ -14,8 +14,12 @@ public class FocusResult {
 	}
 	
 	FocusStatus focusStatus;
-	Optional<Integer> focusFrameTopLeftX;
-	Optional<Integer> focusFrameTopLeftY;
-	Optional<Integer> focusFrameWidth;
-	Optional<Integer> focusFrameHeight;
+	Optional<Coordinate> focusFrameTopLeftCoordinate;
+	Optional<Dimensions> focusFrameDimensions;
+	
+	public String toString() {
+		return focusStatus.toString() + (focusStatus==FocusStatus.OK ? 
+				" at: " + focusFrameTopLeftCoordinate.get() + 
+				" size: " + focusFrameDimensions : "");
+	}
 }

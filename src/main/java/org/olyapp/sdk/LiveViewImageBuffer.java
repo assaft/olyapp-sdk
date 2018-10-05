@@ -7,6 +7,9 @@ import java.util.TreeSet;
 
 import org.olyapp.sdk.utils.StringUtils;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class LiveViewImageBuffer {
 
 	private static int MAX_PACKET_ID = 0xFFFF;
@@ -49,7 +52,6 @@ public class LiveViewImageBuffer {
 				Set<Integer> packetIds = packets.keySet();
 				int normLastPacketId = firstPacketId<lastPacketId ? lastPacketId : lastPacketId + MAX_PACKET_ID + 1;
 				
-				//System.out.println("packets from: " + firstPacketId + " to " + normLastPacketId);
 				for (int i=firstPacketId ; i<=normLastPacketId ; i++) {
 					int mod = i % (MAX_PACKET_ID+1);
 					if (!packetIds.contains(mod)) {
@@ -58,7 +60,7 @@ public class LiveViewImageBuffer {
 				}
 
 				if (missingIds.size()>0) {
-					System.out.println("Out of order packets in image " + StringUtils.toHex(imageId));
+					log.info("Out of order packets in image " + StringUtils.toHex(imageId));
 				}
 				
 			} else {
@@ -66,7 +68,7 @@ public class LiveViewImageBuffer {
 			}
 			
 			if (missingIds.size()>0) {
-				System.out.println("Missing ids in image " +  StringUtils.toHex(imageId) + " are: " + missingIds.toString());
+				log.info("Missing ids in image " +  StringUtils.toHex(imageId) + " are: " + missingIds.toString());
 			}
 		}
 

@@ -4,19 +4,21 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.olyapp.sdk.CameraMainAPI;
 import org.olyapp.sdk.FocusResult;
+import org.olyapp.sdk.ImageResult;
 import org.olyapp.sdk.LiveViewAPI;
 import org.olyapp.sdk.LiveViewHandler;
 import org.olyapp.sdk.LiveViewImageData;
 import org.olyapp.sdk.Property;
 import org.olyapp.sdk.PropertyDesc;
 import org.olyapp.sdk.ProtocolError;
+import org.olyapp.sdk.TakeResult;
+import org.olyapp.sdk.TakeResult.TakeStatus;
 import org.olyapp.sdk.utils.StringUtils;
 
 public class LiveViewAPITest {
@@ -27,7 +29,7 @@ public class LiveViewAPITest {
 	public void init() throws ProtocolError {
 		cameraMainAPI = new CameraMainAPI();  
 		cameraMainAPI.setPlayMode();
-		liveViewAPI = cameraMainAPI.setLiveViewMode("0640x0480");
+		liveViewAPI = cameraMainAPI.setLiveViewMode(20000,1000,"0640x0480");
 	}
 	
 	@Test
@@ -69,7 +71,7 @@ public class LiveViewAPITest {
 
 	@Test
 	public void startStopLiveStreamTest() throws ProtocolError, InterruptedException {
-		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+		liveViewAPI.startLiveView(new LiveViewHandler() {
 			
 			@Override
 			public void onTimeout(long ms) {
@@ -85,7 +87,7 @@ public class LiveViewAPITest {
 				}
 			}
 			
-		},1000);
+		});
 		Thread.sleep(20000);
 		liveViewAPI.stopLiveView();
 	}
@@ -93,7 +95,7 @@ public class LiveViewAPITest {
 	@Test
 	public void runLiveStreamTest1() throws ProtocolError, InterruptedException {
 		long startTime = System.currentTimeMillis();
-		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, -1, 5000); 
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(-1, 5000); 
 		long endTime = System.currentTimeMillis();
 		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
 		images.forEach(imageData->{
@@ -108,7 +110,7 @@ public class LiveViewAPITest {
 	@Test
 	public void runLiveStreamTest2() throws ProtocolError, InterruptedException {
 		long startTime = System.currentTimeMillis();
-		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, 80, -1);
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(80, -1);
 		long endTime = System.currentTimeMillis();
 		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
 		images.forEach(imageData->{
@@ -123,7 +125,7 @@ public class LiveViewAPITest {
 	@Test
 	public void runLiveStreamTest3() throws ProtocolError, InterruptedException {
 		long startTime = System.currentTimeMillis();
-		List<LiveViewImageData> images = liveViewAPI.runLiveView(20000, 1000, 1, -1); 
+		List<LiveViewImageData> images = liveViewAPI.runLiveView(1, -1); 
 		long endTime = System.currentTimeMillis();
 		System.out.println("Total: " + images.size() + " images in " + (endTime-startTime) + " ms");
 		images.forEach(imageData->{
@@ -135,14 +137,12 @@ public class LiveViewAPITest {
 		});
 	}
 	
-
 	@Test
 	public void focusTest() throws ProtocolError, InterruptedException {
-		AtomicReference<FocusResult> focusResult = new AtomicReference<>();
-		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+		liveViewAPI.startLiveView(new LiveViewHandler() {
 			@Override
 			public void onTimeout(long ms) {
-				System.out.println("timeout");
+				System.out.println("timeout expired");
 			}
 			
 			@Override
@@ -150,32 +150,58 @@ public class LiveViewAPITest {
 				System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(imageData.getImageId()));
 			}
 			
-		}, 1000);
+		});
 		Thread.sleep(1000);
-		focusResult.set(liveViewAPI.acquireFocus(327, 213));
+		FocusResult focusResult = liveViewAPI.acquireFocus(40, 40);
 		liveViewAPI.releaseFocus();
 		liveViewAPI.stopLiveView();
-		System.out.println(focusResult.get());
+		System.out.println(focusResult);
 	}
-
 	
 	@Test
 	public void takePicture() throws ProtocolError, InterruptedException, IOException {
-		liveViewAPI.startLiveView(22000, new LiveViewHandler() {
+		liveViewAPI.startLiveView(new LiveViewHandler() {
 			@Override
 			public void onTimeout(long ms) {
+				System.out.println("timeout expired");
 			}
 			
 			@Override
 			public void onImage(LiveViewImageData imageData) {
-				System.out.println(Thread.currentThread().getId() + " - Image consumed: " + StringUtils.toHex(imageData.getImageId()));
+				System.out.println("Image consumed: " + StringUtils.toHex(imageData.getImageId()));
 			}
-		},1000);
+		});
 		Thread.sleep(1000);
-		liveViewAPI.takePicture();
-		Files.write(Paths.get("test_small.jpg"), liveViewAPI.requestSmallSizeJpeg());
-		Files.write(Paths.get("test_big.jpg"), liveViewAPI.requestFullSizeJpeg());
+		TakeResult takeResult = liveViewAPI.takePicture();
+		System.out.println("Picture-taking result: " + takeResult);
 		liveViewAPI.stopLiveView();
+		System.out.println("getting small jpeg");
+		Files.write(Paths.get("test_small.jpg"), liveViewAPI.requestLastTakenSmallSizeJpeg());
+		System.out.println("getting big jpeg");
+		Files.write(Paths.get("test_big.jpg"), liveViewAPI.requestLastTakenFullSizeJpeg());
+		System.out.println("done");
 	}
-
+	
+	@Test
+	public void takeSmallSizeJpeg() throws ProtocolError, InterruptedException, IOException {
+		ImageResult imageResult = liveViewAPI.takeSmallSizeJpeg();
+		if (imageResult.getTakeResult().getTakeStatus()==TakeStatus.OK) {
+			Files.write(Paths.get("test_take_small.jpg"), imageResult.getImage());
+			System.out.println(imageResult.getTakeResult());
+		} else {
+			System.err.println("Failed to take picture: " + imageResult.getTakeResult());
+		}
+	}
+	
+	@Test
+	public void takeFullSizeJpeg() throws ProtocolError, InterruptedException, IOException {
+		ImageResult imageResult = liveViewAPI.takeFullSizeJpeg();
+		if (imageResult.getTakeResult().getTakeStatus()==TakeStatus.OK) {
+			Files.write(Paths.get("test_take_big.jpg"), imageResult.getImage());
+			System.out.println(imageResult.getTakeResult());
+		} else {
+			System.err.println("Failed to take picture: " + imageResult.getTakeResult());
+		}
+	}
+	
 }

@@ -16,8 +16,7 @@ public class LiveViewImageMetadata {
 	
 	byte[] buffer;
 	
-	int width;
-	int height;
+	Dimensions dimensions;
 	
 	int shutterSpeedNumerator;
 	int shutterSpeedDenominator;
@@ -69,8 +68,7 @@ public class LiveViewImageMetadata {
 		focalLength					= interpret(buffer,0xB6,2);
 		
 		SimpleImageInfo	simpleImageInfo = new SimpleImageInfo(imageBuffer.getImage());
-		width = simpleImageInfo.getWidth();
-		height = simpleImageInfo.getHeight();
+		dimensions = new Dimensions(simpleImageInfo.getWidth(),simpleImageInfo.getHeight());
 
 		focusField = 30;
 		autoFocus = true;
@@ -90,7 +88,7 @@ public class LiveViewImageMetadata {
 				"focalLength: " + focalLength + "mm" + "\n" +
 				"exposure warning: " + expWarning + "\n" +
 				"orientation: " + orientation + "(deg: " + orientationDegrees + ")" + "\n" +
-				"dimensions: " + width + "x" + height;
+				"dimensions: " + dimensions;
 	}
 	
 	private int getOrientationDeg(int orientation) {

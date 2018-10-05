@@ -38,14 +38,18 @@ public class CameraMainAPITest {
 
 	@Test
 	public void testLiveViewMode320x240() throws ProtocolError {
-		cameraAPI.setLiveViewMode("0320x0240");
+		cameraAPI.setLiveViewMode(20000,1000,"0320x0240");
 	}
 
 	@Test
 	public void testLiveViewMode640x480() throws ProtocolError {
-		cameraAPI.setLiveViewMode("0640x0480");
+		cameraAPI.setLiveViewMode(20000,1000,"0640x0480");
 	}
-
+	
+	@Test 
+	public void testLiveViewResolutions() throws ProtocolError {
+		System.out.println(cameraAPI.getLiveViewResolutions());
+	}
 
 	@Test
 	public void testPlayMode() throws ProtocolError {

@@ -18,6 +18,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 
+import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -70,9 +71,9 @@ public class LiveViewServer {
 		this.buffer = new byte[1536];
 	}
 	
+	@Synchronized
 	public void start(int port, LiveViewHandler handler, long timeout) throws InterruptedException, ProtocolError {
-		log.info("start() - Started");
-		
+
 		// sanity
 		if (liveStreamOpen.get()) {
 			log.error("Live stream is already open");
@@ -181,13 +182,11 @@ public class LiveViewServer {
 			});
 		} catch (Exception e) {
 			throw new ProtocolError(e.getMessage());
-		} finally {
-			log.info("start() - Finished");
 		}
 	}
 	
+	@Synchronized
 	public void stop() throws InterruptedException {
-		log.info("stop() - Started");
 		if (liveStreamOpen.get()) {
 			liveStreamOpen.set(false);
 			lock.lock();
@@ -199,7 +198,6 @@ public class LiveViewServer {
 				lock.unlock();
 		    }
 		}
-		log.info("stop() - Finished");
 	}
 
 	public boolean isLiveStreamOpen() {
